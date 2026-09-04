@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("STAFF")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customers Customer[] @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String?
+  address   String?
+  gstin     String?
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creator  User      @relation("CreatedBy", fields: [createdBy], references: [id])
+  invoices Invoice[]
+  payments Payment[]
+
+  @@index([name])
+  @@index([phone])
+  @@index([createdBy])
+  @@map("customers")
+}
+
+model Invoice {
+  id          String   @id @default(uuid())
+  invoiceNo   String   @unique
+  customerId  String
+  date        DateTime
+  amount      Int      // stored in paise — avoids floating-point math
+  description String?
+  status      String   @default("DRAFT")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  customer Customer  @relation(fields: [customerId], references: [id])
+  payments Payment[]
+
+  @@index([customerId])
+  @@index([date])
+  @@index([status])
+  @@map("invoices")
+}
+
+model Purchase {
+  id          String   @id @default(uuid())
+  billNo      String?
+  vendor      String
+  date        DateTime
+  amount      Int      // stored in paise
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([vendor])
+  @@index([date])
+  @@map("purchases")
+}
+
+model Payment {
+  id         String   @id @default(uuid())
+  customerId String
+  invoiceId  String?
+  date       DateTime
+  amount     Int      // stored in paise
+  mode       String   @default("CASH")
+  note       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id])
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([customerId])
+  @@index([invoiceId])
+  @@index([date])
+  @@map("payments")
+}
+
+/// Atomic sequence for invoice number generation — avoids race conditions
+model Sequence {
+  id      String @id @default("invoice_seq")
+  current Int    @default(0)
+  @@map("sequences")
+}
