@@ -14,7 +14,7 @@ export class PurchasesService {
   ) {
     const where: any = { deletedAt: null };
     if (filters.vendor) {
-      where.vendor = { contains: filters.vendor, mode: 'insensitive' };
+      where.vendor = { contains: filters.vendor };
     }
     if (filters.dateFrom || filters.dateTo) {
       where.date = {};

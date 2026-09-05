@@ -317,35 +317,26 @@
           <th style="width: 80px;">Rate</th>
           <th style="width: 80px;">Total</th>
         </tr>
-      </thead>
       <tbody>
+        {{#each items}}
         <tr class="item-row">
-          <td class="num">1</td>
-          <td>{{description}}</td>
-          <td class="num"></td>
-          <td class="num">1.00</td>
-          <td class="amount">{{amount}}</td>
-          <td class="amount">{{amount}}</td>
+          <td class="num">{{sno}}</td>
+          <td>{{name}}</td>
+          <td class="num">{{hsn}}</td>
+          <td class="num">{{qty}}</td>
+          <td class="amount">{{rate}}</td>
+          <td class="amount">{{total}}</td>
         </tr>
-        <!-- Empty rows to fill the table area -->
+        {{/each}}
+        {{#each emptyRows}}
         <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        <tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        {{/each}}
       </tbody>
       <tfoot>
         <tr>
           <td colspan="2" style="text-align: right; padding-right: 12px;">Total</td>
           <td></td>
-          <td class="num" style="text-align: center; font-weight: 700;">1.00</td>
+          <td class="num" style="text-align: center; font-weight: 700;">{{totalQty}}</td>
           <td></td>
           <td class="amount">{{totalAmount}}</td>
         </tr>

@@ -31,4 +31,7 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  items?: any[];
 }

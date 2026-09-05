@@ -21,11 +21,51 @@ export class InvoicePdfService {
       maximumFractionDigits: 2,
     });
 
+    let rawItems: any[] = [];
+    if ((invoice as any).items) {
+      try {
+        rawItems = JSON.parse((invoice as any).items);
+      } catch {
+        rawItems = [];
+      }
+    }
+
+    if (!rawItems || rawItems.length === 0) {
+      rawItems = [
+        {
+          name: invoice.description || 'General Goods / Services',
+          hsn: '',
+          qty: 1,
+          rate: amountInRupees,
+          total: amountInRupees,
+        },
+      ];
+    }
+
+    let totalQty = 0;
+    const items = rawItems.map((item: any, idx: number) => {
+      const q = Number(item.qty) || 1;
+      const r = Number(item.rate) || 0;
+      const t = item.total !== undefined ? Number(item.total) : q * r;
+      totalQty += q;
+      return {
+        sno: idx + 1,
+        name: item.name || 'Item',
+        hsn: item.hsn || '',
+        qty: q.toFixed(2),
+        rate: r.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        total: t.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      };
+    });
+
+    const emptyRowCount = Math.max(0, 10 - items.length);
+    const emptyRows = Array.from({ length: emptyRowCount });
+
     const html = template({
-      businessName: 'Sharma Traders',
-      businessAddress: 'MG Road, Pune',
-      businessCity: 'Pune, Maharashtra',
-      businessGstin: '27AAAPS1234A1Z5',
+      businessName: process.env.BUSINESS_NAME || 'Sharma Traders',
+      businessAddress: process.env.BUSINESS_ADDRESS || 'Bangalore, Karnataka',
+      businessCity: process.env.BUSINESS_CITY || 'Pincode: 560058',
+      businessGstin: process.env.BUSINESS_GSTIN || '29AAAPS1234A1Z5',
       invoiceNo: invoice.invoiceNo,
       date: new Date(invoice.date).toLocaleDateString('en-IN', {
         day: '2-digit',
@@ -40,10 +80,16 @@ export class InvoicePdfService {
       description: invoice.description || '—',
       amount: formattedAmount,
       totalAmount: formattedAmount,
+      totalQty: totalQty.toFixed(2),
+      items,
+      emptyRows,
       amountInWords: this.numberToWords(amountInRupees),
     });
 
-    const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+    });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'domcontentloaded' });
     const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });

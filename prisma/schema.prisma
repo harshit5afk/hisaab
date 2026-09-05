@@ -3,29 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum Role {
-  OWNER
-  STAFF
-}
-
-enum InvoiceStatus {
-  DRAFT
-  SENT
-  PAID
-  PARTIALLY_PAID
-  OVERDUE
-}
-
-enum PaymentMode {
-  CASH
-  BANK_TRANSFER
-  UPI
-  CHEQUE
-  OTHER
 }
 
 model User {
@@ -33,7 +12,7 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  role         Role     @default(STAFF)
+  role         String   @default("STAFF")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -66,15 +45,16 @@ model Customer {
 }
 
 model Invoice {
-  id          String        @id @default(uuid())
-  invoiceNo   String        @unique
+  id          String    @id @default(uuid())
+  invoiceNo   String    @unique
   customerId  String
   date        DateTime
-  amount      Int           // stored in paise — avoids floating-point math
+  amount      Int       // stored in paise — avoids floating-point math
   description String?
-  status      InvoiceStatus @default(DRAFT)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  items       String?   // JSON stringified array of line items [{name, hsn, qty, rate, total}]
+  status      String    @default("DRAFT")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
   customer Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
@@ -109,15 +89,15 @@ model Purchase {
 }
 
 model Payment {
-  id         String      @id @default(uuid())
+  id         String    @id @default(uuid())
   customerId String
   invoiceId  String?
   date       DateTime
-  amount     Int         // stored in paise
-  mode       PaymentMode @default(CASH)
+  amount     Int       // stored in paise
+  mode       String    @default("CASH")
   note       String?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)

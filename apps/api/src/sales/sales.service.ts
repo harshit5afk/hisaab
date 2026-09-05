@@ -63,7 +63,7 @@ export class SalesService {
       const trimmedName = dto.customerName.trim();
       let customer = await this.prisma.customer.findFirst({
         where: {
-          name: { equals: trimmedName, mode: 'insensitive' },
+          name: trimmedName,
           deletedAt: null,
         },
       });
@@ -96,13 +96,19 @@ export class SalesService {
     // Generate invoice number atomically
     const invoiceNo = await this.generateInvoiceNumber();
 
+    const itemsJson = dto.items && dto.items.length > 0 ? JSON.stringify(dto.items) : null;
+    const description =
+      dto.description ||
+      (dto.items && dto.items.length > 0 ? dto.items.map((i: any) => i.name).filter(Boolean).join(', ') : null);
+
     return this.prisma.invoice.create({
       data: {
         invoiceNo,
         customerId,
         date: new Date(dto.date),
         amount: dto.amount,
-        description: dto.description,
+        description,
+        items: itemsJson,
       },
       include: { customer: { select: { id: true, name: true, phone: true } } },
     });

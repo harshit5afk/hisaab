@@ -11,9 +11,9 @@ export class CustomersService {
     const where: any = { deletedAt: null };
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' as const } },
+        { name: { contains: search } },
         { phone: { contains: search } },
-        { gstin: { contains: search, mode: 'insensitive' as const } },
+        { gstin: { contains: search } },
       ];
     }
 
