@@ -16,6 +16,7 @@ import { InvoicePdfService } from './invoice-pdf.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('sales')
 export class SalesController {
@@ -67,8 +68,11 @@ export class SalesController {
   }
 
   @Post()
-  create(@Body() dto: CreateInvoiceDto) {
-    return this.salesService.create(dto);
+  create(
+    @Body() dto: CreateInvoiceDto,
+    @CurrentUser('userId') userId: string,
+  ) {
+    return this.salesService.create(dto, userId);
   }
 
   @Patch(':id')

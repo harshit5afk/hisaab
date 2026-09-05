@@ -1,9 +1,25 @@
 import { IsNotEmpty, IsString, IsInt, IsOptional, IsDateString, Min } from 'class-validator';
 
 export class CreateInvoiceDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  customerId: string;
+  customerId?: string;
+
+  @IsOptional()
+  @IsString()
+  customerName?: string;
+
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  customerAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  customerGstin?: string;
 
   @IsDateString()
   date: string;

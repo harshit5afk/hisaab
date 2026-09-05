@@ -56,10 +56,40 @@ export class SalesService {
     return invoice;
   }
 
-  async create(dto: CreateInvoiceDto) {
+  async create(dto: CreateInvoiceDto, userId?: string) {
+    let customerId = dto.customerId;
+
+    if (!customerId && dto.customerName?.trim()) {
+      const trimmedName = dto.customerName.trim();
+      let customer = await this.prisma.customer.findFirst({
+        where: {
+          name: { equals: trimmedName, mode: 'insensitive' },
+          deletedAt: null,
+        },
+      });
+
+      if (!customer) {
+        const effectiveUserId = userId || (await this.getDefaultUserId());
+        customer = await this.prisma.customer.create({
+          data: {
+            name: trimmedName,
+            phone: dto.customerPhone || null,
+            address: dto.customerAddress || null,
+            gstin: dto.customerGstin || null,
+            createdBy: effectiveUserId,
+          },
+        });
+      }
+      customerId = customer.id;
+    }
+
+    if (!customerId) {
+      throw new BadRequestException('Customer is required (please select or enter customer name)');
+    }
+
     // Verify customer exists
     const customer = await this.prisma.customer.findFirst({
-      where: { id: dto.customerId, deletedAt: null },
+      where: { id: customerId, deletedAt: null },
     });
     if (!customer) throw new BadRequestException('Customer not found');
 
@@ -69,13 +99,19 @@ export class SalesService {
     return this.prisma.invoice.create({
       data: {
         invoiceNo,
-        customerId: dto.customerId,
+        customerId,
         date: new Date(dto.date),
         amount: dto.amount,
         description: dto.description,
       },
-      include: { customer: { select: { id: true, name: true } } },
+      include: { customer: { select: { id: true, name: true, phone: true } } },
     });
+  }
+
+  private async getDefaultUserId(): Promise<string> {
+    const user = await this.prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (!user) throw new BadRequestException('No user available to associate with customer');
+    return user.id;
   }
 
   async update(id: string, dto: UpdateInvoiceDto) {
