@@ -23,11 +23,9 @@ export class InvoicePdfService {
 
     let rawItems: any[] = [];
     if ((invoice as any).items) {
-      try {
-        rawItems = JSON.parse((invoice as any).items);
-      } catch {
-        rawItems = [];
-      }
+      // Prisma Json type returns native objects — no JSON.parse needed
+      const items = (invoice as any).items;
+      rawItems = Array.isArray(items) ? items : [];
     }
 
     if (!rawItems || rawItems.length === 0) {

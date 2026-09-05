@@ -51,7 +51,7 @@ model Invoice {
   date        DateTime
   amount      Int       // stored in paise — avoids floating-point math
   description String?
-  items       String?   // JSON stringified array of line items [{name, hsn, qty, rate, total}]
+  items       Json?     // Array of line items [{name, hsn, qty, rate, total}]
   status      String    @default("DRAFT")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

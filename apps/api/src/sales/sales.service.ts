@@ -96,19 +96,23 @@ export class SalesService {
     // Generate invoice number atomically
     const invoiceNo = await this.generateInvoiceNumber();
 
-    const itemsJson = dto.items && dto.items.length > 0 ? JSON.stringify(dto.items) : null;
+    // Server-side amount calculation from items — prevents client/server mismatch
+    const amount = dto.items.reduce((sum, item) => {
+      return sum + Math.round(item.qty * item.rate * 100); // convert to paise
+    }, 0);
+
     const description =
       dto.description ||
-      (dto.items && dto.items.length > 0 ? dto.items.map((i: any) => i.name).filter(Boolean).join(', ') : null);
+      (dto.items.length > 0 ? dto.items.map((i) => i.name).filter(Boolean).join(', ') : null);
 
     return this.prisma.invoice.create({
       data: {
         invoiceNo,
         customerId,
         date: new Date(dto.date),
-        amount: dto.amount,
+        amount,
         description,
-        items: itemsJson,
+        items: dto.items as any, // Prisma Json type handles serialization natively
       },
       include: { customer: { select: { id: true, name: true, phone: true } } },
     });
