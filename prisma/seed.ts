@@ -109,13 +109,13 @@ async function main() {
   // ─── Purchases (7) ──────────────────────────────────────────────────
   console.log('📦 Seeding purchases...');
   const purchaseData = [
-    { billNo: 'PUR-001', vendor: 'Tata Steel Distributors',       date: '2026-06-01', amount: paise(78000),  description: 'Raw steel stock — initial' },
-    { billNo: 'PUR-002', vendor: 'Reliance Textile Mills',        date: '2026-06-08', amount: paise(34500),  description: 'Cotton bulk purchase' },
-    { billNo: 'PUR-003', vendor: 'Havells Supply Co.',             date: '2026-06-20', amount: paise(21300),  description: 'Electrical components' },
-    { billNo: 'PUR-004', vendor: 'National Packaging Suppliers',   date: '2026-07-05', amount: paise(19800),  description: 'Cardboard and packaging material' },
-    { billNo: 'PUR-005', vendor: 'Godrej Furniture Wholesale',     date: '2026-07-19', amount: paise(46200),  description: 'Office furniture stock' },
-    { billNo: 'PUR-006', vendor: 'Tata Steel Distributors',       date: '2026-08-02', amount: paise(55000),  description: 'Raw steel restock — monsoon' },
-    { billNo: 'PUR-007', vendor: 'Havells Supply Co.',             date: '2026-08-16', amount: paise(17400),  description: 'LED components and panels' },
+    { billNo: 'PUR-001', vendor: 'Tata Steel Distributors',       date: '2026-06-01', amount: paise(78000),  description: 'Raw steel stock — initial',           createdBy: owner.id },
+    { billNo: 'PUR-002', vendor: 'Reliance Textile Mills',        date: '2026-06-08', amount: paise(34500),  description: 'Cotton bulk purchase',                createdBy: owner.id },
+    { billNo: 'PUR-003', vendor: 'Havells Supply Co.',             date: '2026-06-20', amount: paise(21300),  description: 'Electrical components',               createdBy: staff.id },
+    { billNo: 'PUR-004', vendor: 'National Packaging Suppliers',   date: '2026-07-05', amount: paise(19800),  description: 'Cardboard and packaging material',    createdBy: staff.id },
+    { billNo: 'PUR-005', vendor: 'Godrej Furniture Wholesale',     date: '2026-07-19', amount: paise(46200),  description: 'Office furniture stock',              createdBy: owner.id },
+    { billNo: 'PUR-006', vendor: 'Tata Steel Distributors',       date: '2026-08-02', amount: paise(55000),  description: 'Raw steel restock — monsoon',         createdBy: owner.id },
+    { billNo: 'PUR-007', vendor: 'Havells Supply Co.',             date: '2026-08-16', amount: paise(17400),  description: 'LED components and panels',           createdBy: staff.id },
   ];
 
   for (const p of purchaseData) {

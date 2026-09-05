@@ -12,12 +12,19 @@ export class ReceivablesService {
    */
   async getBalances() {
     const customers = await this.prisma.customer.findMany({
+      where: { deletedAt: null },
       select: {
         id: true,
         name: true,
         phone: true,
-        invoices: { select: { amount: true } },
-        payments: { select: { amount: true } },
+        invoices: {
+          where: { deletedAt: null },
+          select: { amount: true },
+        },
+        payments: {
+          where: { deletedAt: null },
+          select: { amount: true },
+        },
       },
       orderBy: { name: 'asc' },
     });
@@ -44,18 +51,18 @@ export class ReceivablesService {
    */
   async getLedger(customerId: string) {
     // Verify customer exists
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, deletedAt: null },
     });
     if (!customer) throw new NotFoundException('Customer not found');
 
     const [invoices, payments] = await Promise.all([
       this.prisma.invoice.findMany({
-        where: { customerId },
+        where: { customerId, deletedAt: null },
         orderBy: { date: 'asc' },
       }),
       this.prisma.payment.findMany({
-        where: { customerId },
+        where: { customerId, deletedAt: null },
         orderBy: { date: 'asc' },
       }),
     ]);

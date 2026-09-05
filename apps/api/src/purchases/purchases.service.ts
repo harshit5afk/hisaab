@@ -12,7 +12,7 @@ export class PurchasesService {
     page = 1,
     limit = 20,
   ) {
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (filters.vendor) {
       where.vendor = { contains: filters.vendor, mode: 'insensitive' };
     }
@@ -25,6 +25,9 @@ export class PurchasesService {
     const [data, total] = await Promise.all([
       this.prisma.purchase.findMany({
         where,
+        include: {
+          creator: { select: { id: true, name: true, email: true } },
+        },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { date: 'desc' },
@@ -36,16 +39,25 @@ export class PurchasesService {
   }
 
   async findOne(id: string) {
-    const purchase = await this.prisma.purchase.findUnique({ where: { id } });
+    const purchase = await this.prisma.purchase.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        creator: { select: { id: true, name: true, email: true } },
+      },
+    });
     if (!purchase) throw new NotFoundException('Purchase not found');
     return purchase;
   }
 
-  async create(dto: CreatePurchaseDto) {
+  async create(dto: CreatePurchaseDto, userId: string) {
     return this.prisma.purchase.create({
       data: {
         ...dto,
         date: new Date(dto.date),
+        createdBy: userId,
+      },
+      include: {
+        creator: { select: { id: true, name: true, email: true } },
       },
     });
   }
@@ -66,6 +78,9 @@ export class PurchasesService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.purchase.delete({ where: { id } });
+    return this.prisma.purchase.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }

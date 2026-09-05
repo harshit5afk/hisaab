@@ -21,9 +21,9 @@ export class SalesService {
     page = 1,
     limit = 20,
   ) {
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (filters.customerId) where.customerId = filters.customerId;
-    if (filters.status) where.status = filters.status;
+    if (filters.status) where.status = filters.status as any;
     if (filters.dateFrom || filters.dateTo) {
       where.date = {};
       if (filters.dateFrom) where.date.gte = new Date(filters.dateFrom);
@@ -45,11 +45,11 @@ export class SalesService {
   }
 
   async findOne(id: string) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null },
       include: {
         customer: true,
-        payments: true,
+        payments: { where: { deletedAt: null } },
       },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
@@ -58,8 +58,8 @@ export class SalesService {
 
   async create(dto: CreateInvoiceDto) {
     // Verify customer exists
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: dto.customerId },
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: dto.customerId, deletedAt: null },
     });
     if (!customer) throw new BadRequestException('Customer not found');
 
@@ -106,7 +106,10 @@ export class SalesService {
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException('Can only delete draft invoices');
     }
-    return this.prisma.invoice.delete({ where: { id } });
+    return this.prisma.invoice.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 
   /**

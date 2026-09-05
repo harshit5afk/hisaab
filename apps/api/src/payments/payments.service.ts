@@ -11,7 +11,7 @@ export class PaymentsService {
     page = 1,
     limit = 20,
   ) {
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.dateFrom || filters.dateTo) {
       where.date = {};
@@ -37,8 +37,8 @@ export class PaymentsService {
   }
 
   async findOne(id: string) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { id },
+    const payment = await this.prisma.payment.findFirst({
+      where: { id, deletedAt: null },
       include: {
         customer: true,
         invoice: true,
@@ -50,15 +50,15 @@ export class PaymentsService {
 
   async create(dto: CreatePaymentDto) {
     // Verify customer exists
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: dto.customerId },
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: dto.customerId, deletedAt: null },
     });
     if (!customer) throw new BadRequestException('Customer not found');
 
     // Verify invoice exists if provided
     if (dto.invoiceId) {
-      const invoice = await this.prisma.invoice.findUnique({
-        where: { id: dto.invoiceId },
+      const invoice = await this.prisma.invoice.findFirst({
+        where: { id: dto.invoiceId, deletedAt: null },
       });
       if (!invoice) throw new BadRequestException('Invoice not found');
       if (invoice.customerId !== dto.customerId) {
@@ -84,6 +84,9 @@ export class PaymentsService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.payment.delete({ where: { id } });
+    return this.prisma.payment.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }

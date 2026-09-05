@@ -48,7 +48,9 @@ export class SalesController {
 
   @Get(':id/invoice/pdf')
   async downloadInvoice(@Param('id') id: string, @Res() res: Response) {
-    const invoice = await this.prisma.invoice.findUnique({ where: { id } });
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, deletedAt: null },
+    });
     if (!invoice) throw new NotFoundException('Invoice not found');
 
     const customer = await this.prisma.customer.findUnique({

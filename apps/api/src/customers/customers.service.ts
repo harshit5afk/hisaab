@@ -8,15 +8,14 @@ export class CustomersService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(search?: string, page = 1, limit = 20) {
-    const where = search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { phone: { contains: search } },
-            { gstin: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where: any = { deletedAt: null };
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { phone: { contains: search } },
+        { gstin: { contains: search, mode: 'insensitive' as const } },
+      ];
+    }
 
     const [data, total] = await Promise.all([
       this.prisma.customer.findMany({
@@ -32,7 +31,12 @@ export class CustomersService {
   }
 
   async findOne(id: string) {
-    const customer = await this.prisma.customer.findUnique({ where: { id } });
+    const customer = await this.prisma.customer.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        creator: { select: { id: true, name: true, email: true } },
+      },
+    });
     if (!customer) throw new NotFoundException('Customer not found');
     return customer;
   }
@@ -50,6 +54,9 @@ export class CustomersService {
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.customer.delete({ where: { id } });
+    return this.prisma.customer.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
   }
 }

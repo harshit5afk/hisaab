@@ -4,6 +4,7 @@ dist/
 *.log
 .angular/
 .nest/
+*.tsbuildinfo
 
 # Database
 prisma/dev.db

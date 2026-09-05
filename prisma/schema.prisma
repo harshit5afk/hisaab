@@ -3,8 +3,29 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  STAFF
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+}
+
+enum PaymentMode {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  OTHER
 }
 
 model User {
@@ -12,87 +33,100 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
-  role         String   @default("STAFF")
+  role         Role     @default(STAFF)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   customers Customer[] @relation("CreatedBy")
+  purchases Purchase[] @relation("PurchaseCreatedBy")
 
   @@map("users")
 }
 
 model Customer {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
   phone     String?
   address   String?
   gstin     String?
   createdBy String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  creator  User      @relation("CreatedBy", fields: [createdBy], references: [id])
+  creator  User      @relation("CreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
   invoices Invoice[]
   payments Payment[]
 
   @@index([name])
   @@index([phone])
   @@index([createdBy])
+  @@index([deletedAt])
   @@map("customers")
 }
 
 model Invoice {
-  id          String   @id @default(uuid())
-  invoiceNo   String   @unique
+  id          String        @id @default(uuid())
+  invoiceNo   String        @unique
   customerId  String
   date        DateTime
-  amount      Int      // stored in paise — avoids floating-point math
+  amount      Int           // stored in paise — avoids floating-point math
   description String?
-  status      String   @default("DRAFT")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status      InvoiceStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
 
-  customer Customer  @relation(fields: [customerId], references: [id])
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
   payments Payment[]
 
   @@index([customerId])
   @@index([date])
   @@index([status])
+  @@index([deletedAt])
   @@map("invoices")
 }
 
 model Purchase {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   billNo      String?
   vendor      String
   date        DateTime
-  amount      Int      // stored in paise
+  amount      Int       // stored in paise
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  creator User @relation("PurchaseCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
 
   @@index([vendor])
   @@index([date])
+  @@index([createdBy])
+  @@index([deletedAt])
   @@map("purchases")
 }
 
 model Payment {
-  id         String   @id @default(uuid())
+  id         String      @id @default(uuid())
   customerId String
   invoiceId  String?
   date       DateTime
-  amount     Int      // stored in paise
-  mode       String   @default("CASH")
+  amount     Int         // stored in paise
+  mode       PaymentMode @default(CASH)
   note       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  deletedAt  DateTime?
 
-  customer Customer @relation(fields: [customerId], references: [id])
-  invoice  Invoice? @relation(fields: [invoiceId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoice  Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([customerId])
   @@index([invoiceId])
   @@index([date])
+  @@index([deletedAt])
   @@map("payments")
 }
 
@@ -100,5 +134,6 @@ model Payment {
 model Sequence {
   id      String @id @default("invoice_seq")
   current Int    @default(0)
+
   @@map("sequences")
 }

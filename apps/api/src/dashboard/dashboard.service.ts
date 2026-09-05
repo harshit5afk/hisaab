@@ -18,14 +18,25 @@ export class DashboardService {
       paymentsTodayResult,
       customerCount,
     ] = await Promise.all([
-      this.prisma.invoice.aggregate({ _sum: { amount: true } }),
-      this.prisma.purchase.aggregate({ _sum: { amount: true } }),
-      this.prisma.payment.aggregate({ _sum: { amount: true } }),
+      this.prisma.invoice.aggregate({
+        _sum: { amount: true },
+        where: { deletedAt: null },
+      }),
+      this.prisma.purchase.aggregate({
+        _sum: { amount: true },
+        where: { deletedAt: null },
+      }),
       this.prisma.payment.aggregate({
         _sum: { amount: true },
-        where: { date: { gte: today, lt: tomorrow } },
+        where: { deletedAt: null },
       }),
-      this.prisma.customer.count(),
+      this.prisma.payment.aggregate({
+        _sum: { amount: true },
+        where: { date: { gte: today, lt: tomorrow }, deletedAt: null },
+      }),
+      this.prisma.customer.count({
+        where: { deletedAt: null },
+      }),
     ]);
 
     const totalSales = totalSalesResult._sum.amount ?? 0;
@@ -60,15 +71,15 @@ export class DashboardService {
       const [sales, purchases, payments] = await Promise.all([
         this.prisma.invoice.aggregate({
           _sum: { amount: true },
-          where: { date: { gte: start, lt: end } },
+          where: { date: { gte: start, lt: end }, deletedAt: null },
         }),
         this.prisma.purchase.aggregate({
           _sum: { amount: true },
-          where: { date: { gte: start, lt: end } },
+          where: { date: { gte: start, lt: end }, deletedAt: null },
         }),
         this.prisma.payment.aggregate({
           _sum: { amount: true },
-          where: { date: { gte: start, lt: end } },
+          where: { date: { gte: start, lt: end }, deletedAt: null },
         }),
       ]);
 
