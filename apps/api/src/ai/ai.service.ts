@@ -50,7 +50,7 @@ export class AiService {
     const client = this.ensureClient();
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 1024,
       messages: [
         {
@@ -115,11 +115,18 @@ Set confidence to "low" if the image is blurry or partially visible.`,
 
     // Fetch summarised customer balance data for context
     const customers = await this.prisma.customer.findMany({
+      where: { deletedAt: null },
       select: {
         name: true,
         phone: true,
-        invoices: { select: { amount: true, invoiceNo: true, date: true, status: true } },
-        payments: { select: { amount: true, date: true, mode: true } },
+        invoices: {
+          where: { deletedAt: null },
+          select: { amount: true, invoiceNo: true, date: true, status: true },
+        },
+        payments: {
+          where: { deletedAt: null },
+          select: { amount: true, date: true, mode: true },
+        },
       },
     });
 
@@ -140,7 +147,7 @@ Set confidence to "low" if the image is blurry or partially visible.`,
     const dataUsed = JSON.stringify(context, null, 2);
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-5',
       max_tokens: 512,
       system: `You are a helpful accounting assistant for an Indian business called Hisaab.
 You have access to the following customer summary data (amounts in ₹):
