@@ -13,6 +13,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ReceivablesModule } from './receivables/receivables.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { AiModule } from './ai/ai.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { AiModule } from './ai/ai.module';
     PrismaModule,
     AuthModule,
     CustomersModule,
+    ProductsModule,
     SalesModule,
     PurchasesModule,
     PaymentsModule,

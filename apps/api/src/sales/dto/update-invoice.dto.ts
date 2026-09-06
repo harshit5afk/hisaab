@@ -6,6 +6,8 @@ import {
   IsEnum,
   IsArray,
   ArrayMinSize,
+  IsNumber,
+  IsBoolean,
   ValidateNested,
   Min,
 } from 'class-validator';
@@ -22,6 +24,20 @@ export class UpdateInvoiceDto {
   @IsInt()
   @Min(1)
   amount?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isGstInvoice?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxRate?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  otherAmount?: number;
 
   @IsOptional()
   @IsString()

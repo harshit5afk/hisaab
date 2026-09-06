@@ -14,16 +14,21 @@ export class InvoicePdfService {
     const templateHtml = fs.readFileSync(templatePath, 'utf-8');
     const template = handlebars.compile(templateHtml);
 
-    // Amount is stored in paise — convert to rupees for display
-    const amountInRupees = invoice.amount / 100;
-    const formattedAmount = amountInRupees.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+    // Amounts in rupees
+    const subtotalInRupees = (invoice.amount || 0) / 100;
+    const grandTotalPaise = invoice.totalAmount || invoice.amount || 0;
+    const grandTotalInRupees = grandTotalPaise / 100;
+
+    const cgstInRupees = (invoice.cgst || 0) / 100;
+    const sgstInRupees = (invoice.sgst || 0) / 100;
+    const igstInRupees = (invoice.igst || 0) / 100;
+    const otherInRupees = (invoice.otherAmount || 0) / 100;
+
+    const formatInr = (n: number) =>
+      n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     let rawItems: any[] = [];
     if ((invoice as any).items) {
-      // Prisma Json type returns native objects — no JSON.parse needed
       const items = (invoice as any).items;
       rawItems = Array.isArray(items) ? items : [];
     }
@@ -34,8 +39,8 @@ export class InvoicePdfService {
           name: invoice.description || 'General Goods / Services',
           hsn: '',
           qty: 1,
-          rate: amountInRupees,
-          total: amountInRupees,
+          rate: subtotalInRupees,
+          total: subtotalInRupees,
         },
       ];
     }
@@ -51,19 +56,30 @@ export class InvoicePdfService {
         name: item.name || 'Item',
         hsn: item.hsn || '',
         qty: q.toFixed(2),
-        rate: r.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        total: t.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        rate: formatInr(r),
+        total: formatInr(t),
       };
     });
 
     const emptyRowCount = Math.max(0, 10 - items.length);
     const emptyRows = Array.from({ length: emptyRowCount });
 
+    const isGstInvoice = Boolean(invoice.isGstInvoice);
+    const taxRate = invoice.taxRate ?? 18;
+    const customerState = customer.state || this.extractState(customer.address);
+
     const html = template({
       businessName: process.env.BUSINESS_NAME || 'Sharma Traders',
       businessAddress: process.env.BUSINESS_ADDRESS || 'Bangalore, Karnataka',
       businessCity: process.env.BUSINESS_CITY || 'Pincode: 560058',
       businessGstin: process.env.BUSINESS_GSTIN || '29AAAPS1234A1Z5',
+      invoiceTitle: isGstInvoice ? 'Tax Invoice' : 'Invoice',
+      isGstInvoice,
+      taxRate,
+      halfTaxRate: (taxRate / 2).toFixed(1).replace(/\.0$/, ''),
+      hasCgstSgst: isGstInvoice && (cgstInRupees > 0 || sgstInRupees > 0),
+      hasIgst: isGstInvoice && igstInRupees > 0,
+      hasOtherAmount: otherInRupees > 0,
       invoiceNo: invoice.invoiceNo,
       date: new Date(invoice.date).toLocaleDateString('en-IN', {
         day: '2-digit',
@@ -74,14 +90,18 @@ export class InvoicePdfService {
       customerAddress: customer.address || '—',
       customerPhone: customer.phone || '—',
       customerGstin: customer.gstin || '—',
-      customerState: this.extractState(customer.address),
+      customerState,
       description: invoice.description || '—',
-      amount: formattedAmount,
-      totalAmount: formattedAmount,
+      subtotalAmount: formatInr(subtotalInRupees),
+      cgstAmount: formatInr(cgstInRupees),
+      sgstAmount: formatInr(sgstInRupees),
+      igstAmount: formatInr(igstInRupees),
+      otherChargesAmount: formatInr(otherInRupees),
+      totalAmount: formatInr(grandTotalInRupees),
       totalQty: totalQty.toFixed(2),
       items,
       emptyRows,
-      amountInWords: this.numberToWords(amountInRupees),
+      amountInWords: this.numberToWords(grandTotalInRupees),
     });
 
     const browser = await puppeteer.launch({
@@ -107,9 +127,40 @@ export class InvoicePdfService {
   private numberToWords(num: number): string {
     if (num === 0) return 'ZERO RUPEES ONLY';
 
-    const ones = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
-      'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN'];
-    const tens = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+    const ones = [
+      '',
+      'ONE',
+      'TWO',
+      'THREE',
+      'FOUR',
+      'FIVE',
+      'SIX',
+      'SEVEN',
+      'EIGHT',
+      'NINE',
+      'TEN',
+      'ELEVEN',
+      'TWELVE',
+      'THIRTEEN',
+      'FOURTEEN',
+      'FIFTEEN',
+      'SIXTEEN',
+      'SEVENTEEN',
+      'EIGHTEEN',
+      'NINETEEN',
+    ];
+    const tens = [
+      '',
+      '',
+      'TWENTY',
+      'THIRTY',
+      'FORTY',
+      'FIFTY',
+      'SIXTY',
+      'SEVENTY',
+      'EIGHTY',
+      'NINETY',
+    ];
 
     const wholePart = Math.floor(num);
     const paisePart = Math.round((num - wholePart) * 100);
@@ -146,4 +197,3 @@ export class InvoicePdfService {
     return result;
   }
 }
-

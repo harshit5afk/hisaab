@@ -7,12 +7,17 @@ import {
   IsArray,
   ArrayMinSize,
   IsNumber,
+  IsBoolean,
   ValidateNested,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InvoiceLineItemDto {
+  @IsOptional()
+  @IsString()
+  productId?: string;
+
   @IsNotEmpty()
   @IsString()
   name: string;
@@ -56,6 +61,10 @@ export class CreateInvoiceDto {
   @IsString()
   customerGstin?: string;
 
+  @IsOptional()
+  @IsString()
+  customerState?: string;
+
   @IsDateString()
   date: string;
 
@@ -63,6 +72,20 @@ export class CreateInvoiceDto {
   @IsInt()
   @Min(1)
   amount?: number; // optional — server auto-calculates from items
+
+  @IsOptional()
+  @IsBoolean()
+  isGstInvoice?: boolean; // toggle: true = GST Tax Invoice, false = regular
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxRate?: number; // default 18% when isGstInvoice is true
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  otherAmount?: number; // extra charges in paise (default 0)
 
   @IsOptional()
   @IsString()

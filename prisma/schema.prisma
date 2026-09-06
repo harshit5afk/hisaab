@@ -28,6 +28,7 @@ model Customer {
   phone     String?
   address   String?
   gstin     String?
+  state     String?
   createdBy String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -49,8 +50,15 @@ model Invoice {
   invoiceNo   String    @unique
   customerId  String
   date        DateTime
-  amount      Int       // stored in paise — avoids floating-point math
-  description String?
+  amount       Int       // stored in paise — subtotal
+  isGstInvoice Boolean   @default(false)
+  taxRate      Float?    @default(18)
+  cgst         Int       @default(0) // in paise
+  sgst         Int       @default(0) // in paise
+  igst         Int       @default(0) // in paise
+  otherAmount  Int       @default(0) // in paise
+  totalAmount  Int       @default(0) // amount + cgst + sgst + igst + otherAmount (in paise)
+  description  String?
   items       Json?     // Array of line items [{name, hsn, qty, rate, total}]
   status      String    @default("DRAFT")
   createdAt   DateTime  @default(now())
@@ -93,12 +101,13 @@ model Payment {
   customerId String
   invoiceId  String?
   date       DateTime
-  amount     Int       // stored in paise
-  mode       String    @default("CASH")
-  note       String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  amount          Int       // stored in paise
+  mode            String    @default("CASH")
+  bankAccountName String?   // e.g. "Axis Bank", "SBI" — for BANK_TRANSFER / CHEQUE
+  note            String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
   invoice  Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
@@ -108,6 +117,21 @@ model Payment {
   @@index([date])
   @@index([deletedAt])
   @@map("payments")
+}
+
+model Product {
+  id        String    @id @default(uuid())
+  name      String
+  hsn       String?
+  unit      String    @default("NOS") // NOS, PCS, KG, LTR, MTR etc.
+  rate      Int       // default selling rate in paise
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([name])
+  @@index([deletedAt])
+  @@map("products")
 }
 
 /// Atomic sequence for invoice number generation — avoids race conditions

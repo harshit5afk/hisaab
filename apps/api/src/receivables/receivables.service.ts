@@ -7,7 +7,7 @@ export class ReceivablesService {
 
   /**
    * Get balance for all customers.
-   * Balance = SUM(invoices.amount) - SUM(payments.amount)
+   * Balance = SUM(invoices.totalAmount) - SUM(payments.amount)
    * Always computed, never stored.
    */
   async getBalances() {
@@ -17,9 +17,10 @@ export class ReceivablesService {
         id: true,
         name: true,
         phone: true,
+        state: true,
         invoices: {
           where: { deletedAt: null },
-          select: { amount: true },
+          select: { amount: true, totalAmount: true },
         },
         payments: {
           where: { deletedAt: null },
@@ -31,12 +32,16 @@ export class ReceivablesService {
 
     return customers
       .map((c) => {
-        const totalInvoiced = c.invoices.reduce((sum, inv) => sum + inv.amount, 0);
+        const totalInvoiced = c.invoices.reduce(
+          (sum, inv) => sum + (inv.totalAmount || inv.amount),
+          0,
+        );
         const totalPaid = c.payments.reduce((sum, pay) => sum + pay.amount, 0);
         return {
           customerId: c.id,
           customerName: c.name,
           phone: c.phone,
+          state: c.state,
           totalInvoiced,
           totalPaid,
           balance: totalInvoiced - totalPaid,
@@ -74,6 +79,7 @@ export class ReceivablesService {
       type: 'INVOICE' | 'PAYMENT';
       reference: string;
       description?: string | null;
+      isGstInvoice?: boolean;
       debit: number;
       credit: number;
     }> = [];
@@ -85,17 +91,19 @@ export class ReceivablesService {
         type: 'INVOICE',
         reference: inv.invoiceNo,
         description: inv.description,
-        debit: inv.amount,
+        isGstInvoice: inv.isGstInvoice,
+        debit: inv.totalAmount || inv.amount,
         credit: 0,
       });
     }
 
     for (const pay of payments) {
+      const modeRef = pay.bankAccountName ? `${pay.mode} (${pay.bankAccountName})` : pay.mode;
       entries.push({
         id: pay.id,
         date: pay.date,
         type: 'PAYMENT',
-        reference: pay.mode,
+        reference: modeRef,
         description: pay.note,
         debit: 0,
         credit: pay.amount,
@@ -125,6 +133,7 @@ export class ReceivablesService {
         id: customer.id,
         name: customer.name,
         phone: customer.phone,
+        state: customer.state,
       },
       ledger,
       finalBalance: runningBalance,

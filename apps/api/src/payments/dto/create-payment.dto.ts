@@ -30,5 +30,9 @@ export class CreatePaymentDto {
 
   @IsOptional()
   @IsString()
+  bankAccountName?: string; // e.g. "Axis Bank", "SBI"
+
+  @IsOptional()
+  @IsString()
   note?: string;
 }

@@ -121,7 +121,7 @@ Set confidence to "low" if the image is blurry or partially visible.`,
         phone: true,
         invoices: {
           where: { deletedAt: null },
-          select: { amount: true, invoiceNo: true, date: true, status: true },
+          select: { amount: true, totalAmount: true, invoiceNo: true, date: true, status: true },
         },
         payments: {
           where: { deletedAt: null },
@@ -131,7 +131,7 @@ Set confidence to "low" if the image is blurry or partially visible.`,
     });
 
     const context = customers.map((c) => {
-      const totalInvoiced = c.invoices.reduce((s, i) => s + i.amount, 0);
+      const totalInvoiced = c.invoices.reduce((s, i) => s + (i.totalAmount || i.amount), 0);
       const totalPaid = c.payments.reduce((s, p) => s + p.amount, 0);
       return {
         name: c.name,

@@ -73,6 +73,7 @@ export class PaymentsService {
         date: new Date(dto.date),
         amount: dto.amount,
         mode: dto.mode,
+        bankAccountName: dto.bankAccountName || null,
         note: dto.note,
       },
       include: {

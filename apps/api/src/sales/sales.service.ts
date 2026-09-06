@@ -34,7 +34,7 @@ export class SalesService {
     const [data, total] = await Promise.all([
       this.prisma.invoice.findMany({
         where,
-        include: { customer: { select: { id: true, name: true, phone: true } } },
+        include: { customer: { select: { id: true, name: true, phone: true, state: true } } },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { date: 'desc' },
@@ -80,6 +80,7 @@ export class SalesService {
             phone: dto.customerPhone || null,
             address: dto.customerAddress || null,
             gstin: dto.customerGstin || null,
+            state: dto.customerState || null,
             createdBy: userId,
           },
         });
@@ -105,6 +106,7 @@ export class SalesService {
       const qty = Number(i.qty);
       const rate = Number(i.rate);
       return {
+        productId: i.productId?.trim() || undefined,
         name: i.name.trim(),
         hsn: i.hsn?.trim() || '',
         qty,
@@ -113,10 +115,35 @@ export class SalesService {
       };
     });
 
-    // Server-side amount calculation from items — avoids client/server mismatch
+    // Server-side subtotal calculation from items (in paise)
     const amount = sanitizedItems.reduce((sum, item) => {
-      return sum + Math.round(item.qty * item.rate * 100); // convert to paise
+      return sum + Math.round(item.qty * item.rate * 100);
     }, 0);
+
+    // GST calculations
+    const isGstInvoice = Boolean(dto.isGstInvoice);
+    const taxRate = isGstInvoice ? (dto.taxRate !== undefined ? Number(dto.taxRate) : 18) : 0;
+    const otherAmount = dto.otherAmount ? Math.max(0, Math.round(Number(dto.otherAmount))) : 0;
+
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
+    if (isGstInvoice && taxRate > 0) {
+      const businessState = (process.env.BUSINESS_STATE || 'RAJASTHAN').trim().toUpperCase();
+      const customerState = (customer.state || '').trim().toUpperCase();
+      const isSameState = !customerState || customerState === businessState;
+      const totalTax = Math.round((amount * taxRate) / 100);
+
+      if (isSameState) {
+        cgst = Math.round(totalTax / 2);
+        sgst = totalTax - cgst; // exact reconciliation prevents 1-paisa rounding errors
+      } else {
+        igst = totalTax;
+      }
+    }
+
+    const totalAmount = amount + cgst + sgst + igst + otherAmount;
 
     const description =
       dto.description ||
@@ -130,10 +157,17 @@ export class SalesService {
         customerId,
         date: new Date(dto.date),
         amount,
+        isGstInvoice,
+        taxRate: isGstInvoice ? taxRate : null,
+        cgst,
+        sgst,
+        igst,
+        otherAmount,
+        totalAmount,
         description,
         items: sanitizedItems as any,
       },
-      include: { customer: { select: { id: true, name: true, phone: true } } },
+      include: { customer: { select: { id: true, name: true, phone: true, state: true } } },
     });
   }
 
@@ -143,20 +177,28 @@ export class SalesService {
     // Prevent modifying core financial fields of a PAID invoice
     if (
       invoice.status === 'PAID' &&
-      (dto.amount !== undefined || dto.date || dto.description !== undefined || dto.items)
+      (dto.amount !== undefined ||
+        dto.date ||
+        dto.description !== undefined ||
+        dto.items ||
+        dto.isGstInvoice !== undefined ||
+        dto.taxRate !== undefined ||
+        dto.otherAmount !== undefined)
     ) {
       throw new BadRequestException(
-        'Cannot edit amount, date, description, or items of a paid invoice',
+        'Cannot edit financial details, date, description, items or taxes of a paid invoice',
       );
     }
 
-    let updateAmount = dto.amount;
+    let updateAmount = invoice.amount;
     let sanitizedItems = undefined;
+
     if (dto.items && dto.items.length > 0) {
       sanitizedItems = dto.items.map((i) => {
         const qty = Number(i.qty);
         const rate = Number(i.rate);
         return {
+          productId: i.productId?.trim() || undefined,
           name: i.name.trim(),
           hsn: i.hsn?.trim() || '',
           qty,
@@ -164,18 +206,55 @@ export class SalesService {
           total: Math.round(qty * rate * 100) / 100,
         };
       });
-      // Always recalculate amount from updated items to maintain consistency
       updateAmount = sanitizedItems.reduce(
         (sum, item) => sum + Math.round(item.qty * item.rate * 100),
         0,
       );
+    } else if (dto.amount !== undefined) {
+      updateAmount = dto.amount;
     }
+
+    const isGstInvoice =
+      dto.isGstInvoice !== undefined ? Boolean(dto.isGstInvoice) : invoice.isGstInvoice;
+    const taxRate =
+      dto.taxRate !== undefined
+        ? Number(dto.taxRate)
+        : (invoice.taxRate ?? (isGstInvoice ? 18 : 0));
+    const otherAmount =
+      dto.otherAmount !== undefined ? Math.round(Number(dto.otherAmount)) : invoice.otherAmount;
+
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
+    if (isGstInvoice && taxRate > 0) {
+      const businessState = (process.env.BUSINESS_STATE || 'RAJASTHAN').trim().toUpperCase();
+      const customerState = (invoice.customer?.state || '').trim().toUpperCase();
+      const isSameState = !customerState || customerState === businessState;
+      const totalTax = Math.round((updateAmount * taxRate) / 100);
+
+      if (isSameState) {
+        cgst = Math.round(totalTax / 2);
+        sgst = totalTax - cgst;
+      } else {
+        igst = totalTax;
+      }
+    }
+
+    const totalAmount = updateAmount + cgst + sgst + igst + otherAmount;
 
     return this.prisma.invoice.update({
       where: { id },
       data: {
         ...(dto.date && { date: new Date(dto.date) }),
-        ...(updateAmount !== undefined && { amount: updateAmount }),
+        amount: updateAmount,
+        isGstInvoice,
+        taxRate: isGstInvoice ? taxRate : null,
+        cgst,
+        sgst,
+        igst,
+        otherAmount,
+        totalAmount,
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.status && { status: dto.status }),
         ...(sanitizedItems && { items: sanitizedItems as any }),
@@ -200,7 +279,6 @@ export class SalesService {
    */
   private async generateInvoiceNumber(): Promise<string> {
     return this.prisma.$transaction(async (tx) => {
-      // Upsert sequence (create on first use)
       const seq = await tx.sequence.upsert({
         where: { id: 'invoice_seq' },
         update: { current: { increment: 1 } },

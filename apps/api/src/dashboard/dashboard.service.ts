@@ -12,14 +12,14 @@ export class DashboardService {
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const [
-      totalSalesResult,
+      invoiceSumsResult,
       totalPurchasesResult,
       totalPaymentsResult,
       paymentsTodayResult,
       customerCount,
     ] = await Promise.all([
       this.prisma.invoice.aggregate({
-        _sum: { amount: true },
+        _sum: { amount: true, totalAmount: true },
         where: { deletedAt: null },
       }),
       this.prisma.purchase.aggregate({
@@ -39,12 +39,14 @@ export class DashboardService {
       }),
     ]);
 
-    const totalSales = totalSalesResult._sum.amount ?? 0;
+    const totalSales = invoiceSumsResult._sum.amount ?? 0;
+    const totalBilled = invoiceSumsResult._sum.totalAmount ?? totalSales;
     const totalPaid = totalPaymentsResult._sum.amount ?? 0;
 
     return {
-      totalReceivable: totalSales - totalPaid,
-      totalSales,
+      totalReceivable: totalBilled - totalPaid,
+      totalSales, // net goods sales
+      totalBilled, // grand total including GST & other charges
       totalPurchases: totalPurchasesResult._sum.amount ?? 0,
       paymentsToday: paymentsTodayResult._sum.amount ?? 0,
       customerCount,
@@ -56,6 +58,7 @@ export class DashboardService {
     const results: Array<{
       month: string;
       sales: number;
+      billed: number;
       purchases: number;
       payments: number;
     }> = [];
@@ -70,7 +73,7 @@ export class DashboardService {
 
       const [sales, purchases, payments] = await Promise.all([
         this.prisma.invoice.aggregate({
-          _sum: { amount: true },
+          _sum: { amount: true, totalAmount: true },
           where: { date: { gte: start, lt: end }, deletedAt: null },
         }),
         this.prisma.purchase.aggregate({
@@ -83,9 +86,13 @@ export class DashboardService {
         }),
       ]);
 
+      const subtotal = sales._sum.amount ?? 0;
+      const billed = sales._sum.totalAmount ?? subtotal;
+
       results.push({
         month: `${year}-${String(month + 1).padStart(2, '0')}`,
-        sales: sales._sum.amount ?? 0,
+        sales: subtotal,
+        billed,
         purchases: purchases._sum.amount ?? 0,
         payments: payments._sum.amount ?? 0,
       });
