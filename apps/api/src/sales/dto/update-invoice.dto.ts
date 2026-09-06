@@ -1,5 +1,17 @@
-import { IsOptional, IsString, IsInt, IsDateString, IsEnum, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  IsDateString,
+  IsEnum,
+  IsArray,
+  ArrayMinSize,
+  ValidateNested,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { InvoiceStatus } from '../../common/enums';
+import { InvoiceLineItemDto } from './create-invoice.dto';
 
 export class UpdateInvoiceDto {
   @IsOptional()
@@ -18,4 +30,11 @@ export class UpdateInvoiceDto {
   @IsOptional()
   @IsEnum(InvoiceStatus)
   status?: InvoiceStatus;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Invoice must contain at least 1 line item' })
+  @ValidateNested({ each: true })
+  @Type(() => InvoiceLineItemDto)
+  items?: InvoiceLineItemDto[];
 }

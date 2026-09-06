@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsDateString,
   IsArray,
+  ArrayMinSize,
   IsNumber,
   ValidateNested,
   Min,
@@ -28,9 +29,10 @@ export class InvoiceLineItemDto {
   @Min(0)
   rate: number;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  total: number;
+  total?: number; // optional — server auto-computes qty * rate
 }
 
 export class CreateInvoiceDto {
@@ -67,6 +69,7 @@ export class CreateInvoiceDto {
   description?: string;
 
   @IsArray()
+  @ArrayMinSize(1, { message: 'Invoice must contain at least 1 line item' })
   @ValidateNested({ each: true })
   @Type(() => InvoiceLineItemDto)
   items: InvoiceLineItemDto[];

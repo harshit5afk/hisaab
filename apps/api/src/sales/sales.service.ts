@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
@@ -60,6 +61,10 @@ export class SalesService {
     let customerId = dto.customerId;
 
     if (!customerId && dto.customerName?.trim()) {
+      if (!userId) {
+        throw new UnauthorizedException('User authentication required to create customer');
+      }
+
       const trimmedName = dto.customerName.trim();
       let customer = await this.prisma.customer.findFirst({
         where: {
@@ -69,14 +74,13 @@ export class SalesService {
       });
 
       if (!customer) {
-        const effectiveUserId = userId || (await this.getDefaultUserId());
         customer = await this.prisma.customer.create({
           data: {
             name: trimmedName,
             phone: dto.customerPhone || null,
             address: dto.customerAddress || null,
             gstin: dto.customerGstin || null,
-            createdBy: effectiveUserId,
+            createdBy: userId,
           },
         });
       }
@@ -96,14 +100,29 @@ export class SalesService {
     // Generate invoice number atomically
     const invoiceNo = await this.generateInvoiceNumber();
 
-    // Server-side amount calculation from items — prevents client/server mismatch
-    const amount = dto.items.reduce((sum, item) => {
+    // Sanitize items and force verified line totals (qty * rate)
+    const sanitizedItems = dto.items.map((i) => {
+      const qty = Number(i.qty);
+      const rate = Number(i.rate);
+      return {
+        name: i.name.trim(),
+        hsn: i.hsn?.trim() || '',
+        qty,
+        rate,
+        total: Math.round(qty * rate * 100) / 100,
+      };
+    });
+
+    // Server-side amount calculation from items — avoids client/server mismatch
+    const amount = sanitizedItems.reduce((sum, item) => {
       return sum + Math.round(item.qty * item.rate * 100); // convert to paise
     }, 0);
 
     const description =
       dto.description ||
-      (dto.items.length > 0 ? dto.items.map((i) => i.name).filter(Boolean).join(', ') : null);
+      (sanitizedItems.length > 0
+        ? sanitizedItems.map((i) => i.name).filter(Boolean).join(', ')
+        : null);
 
     return this.prisma.invoice.create({
       data: {
@@ -112,37 +131,54 @@ export class SalesService {
         date: new Date(dto.date),
         amount,
         description,
-        items: dto.items as any, // Prisma Json type handles serialization natively
+        items: sanitizedItems as any,
       },
       include: { customer: { select: { id: true, name: true, phone: true } } },
     });
   }
 
-  private async getDefaultUserId(): Promise<string> {
-    const user = await this.prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
-    if (!user) throw new BadRequestException('No user available to associate with customer');
-    return user.id;
-  }
-
   async update(id: string, dto: UpdateInvoiceDto) {
     const invoice = await this.findOne(id);
 
-    // Don't allow editing paid invoices (except status changes)
+    // Prevent modifying core financial fields of a PAID invoice
     if (
       invoice.status === 'PAID' &&
-      dto.status !== 'PAID' &&
-      (dto.amount || dto.date || dto.description)
+      (dto.amount !== undefined || dto.date || dto.description !== undefined || dto.items)
     ) {
-      throw new BadRequestException('Cannot edit a paid invoice');
+      throw new BadRequestException(
+        'Cannot edit amount, date, description, or items of a paid invoice',
+      );
+    }
+
+    let updateAmount = dto.amount;
+    let sanitizedItems = undefined;
+    if (dto.items && dto.items.length > 0) {
+      sanitizedItems = dto.items.map((i) => {
+        const qty = Number(i.qty);
+        const rate = Number(i.rate);
+        return {
+          name: i.name.trim(),
+          hsn: i.hsn?.trim() || '',
+          qty,
+          rate,
+          total: Math.round(qty * rate * 100) / 100,
+        };
+      });
+      // Always recalculate amount from updated items to maintain consistency
+      updateAmount = sanitizedItems.reduce(
+        (sum, item) => sum + Math.round(item.qty * item.rate * 100),
+        0,
+      );
     }
 
     return this.prisma.invoice.update({
       where: { id },
       data: {
         ...(dto.date && { date: new Date(dto.date) }),
-        ...(dto.amount && { amount: dto.amount }),
+        ...(updateAmount !== undefined && { amount: updateAmount }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.status && { status: dto.status }),
+        ...(sanitizedItems && { items: sanitizedItems as any }),
       },
     });
   }
