@@ -312,7 +312,7 @@ interface NavItem {
 })
 export class Shell {
   sidebarCollapsed = signal(false);
-  selectedTheme = signal<'light' | 'dark' | 'ocean' | 'forest' | 'sunset'>('dark');
+  selectedTheme = signal<'light' | 'dark' | 'ocean' | 'forest' | 'sunset'>(this.getStoredTheme());
 
   themeOptions = [
     { value: 'dark', label: 'Dark' },
@@ -343,8 +343,16 @@ export class Shell {
     this.applyTheme(theme);
   }
 
+  private getStoredTheme(): 'light' | 'dark' | 'ocean' | 'forest' | 'sunset' {
+    const savedTheme = localStorage.getItem('hisaab-theme');
+    return savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'ocean' || savedTheme === 'forest' || savedTheme === 'sunset'
+      ? savedTheme
+      : 'dark';
+  }
+
   private applyTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
     document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('hisaab-theme', theme);
   }
 
   toggleSidebar() {

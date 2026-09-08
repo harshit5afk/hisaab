@@ -284,7 +284,7 @@ export interface InvoiceLineItem {
                 <div class="item-fields">
                   <!-- Product Name with Catalog Autocomplete & Dropdown Arrow -->
                   <mat-form-field appearance="outline" class="product-name-field">
-                    <mat-label>Product / Service Name **</mat-label>
+                    <mat-label>Product / Service Name *</mat-label>
                     <input
                       matInput
                       #productAutoTrigger="matAutocompleteTrigger"
@@ -295,7 +295,7 @@ export interface InvoiceLineItem {
                       (click)="onProductInputClick($index, productAutoTrigger)"
                       (input)="filterProducts($any($event.target).value)"
                       (ngModelChange)="onItemUpdated($index)"
-                      placeholder="e.g. INLINE CRUZE SEDIMENT, PRE CARBON"
+                      placeholder="Type letter to search..."
                       autocomplete="off"
                       required
                     />
@@ -325,7 +325,7 @@ export interface InvoiceLineItem {
                       } @else {
                         <div class="dropdown-count-header">
                           <span class="count-badge">{{ filteredProducts().length }}</span>
-                          <span>Showing {{ filteredProducts().length }} products in catalog</span>
+                          <span>Showing all {{ filteredProducts().length }} catalog products</span>
                         </div>
                       }
 
@@ -338,13 +338,15 @@ export interface InvoiceLineItem {
                                 <span class="p-hsn-badge">HSN: {{ p.hsn }}</span>
                               }
                             </div>
-                            <span class="p-rate">₹ {{ (p.rate / 100).toFixed(2) }}</span>
+                            <div class="p-rate">
+                              ₹ {{ (p.rate / 100).toFixed(2) }}
+                            </div>
                           </div>
                         </mat-option>
                       }
                       @if (filteredProducts().length === 0) {
                         <mat-option disabled class="no-result-option">
-                          <span class="no-result-text">No product found matching "{{ productSearchQuery() }}". You can type custom name.</span>
+                          <span class="no-match-text">No product found matching "{{ productSearchQuery() }}". Enter custom name.</span>
                         </mat-option>
                       }
                     </mat-autocomplete>
@@ -352,18 +354,17 @@ export interface InvoiceLineItem {
 
                   <!-- HSN/SAC -->
                   <mat-form-field appearance="outline" class="hsn-field">
-                    <mat-label>HSN / ...</mat-label>
+                    <mat-label>HSN / SAC</mat-label>
                     <input
                       matInput
                       [(ngModel)]="item.hsn"
                       [ngModelOptions]="{ standalone: true }"
-                      placeholder="e.g. 8421"
                     />
                   </mat-form-field>
 
                   <!-- Quantity -->
                   <mat-form-field appearance="outline" class="qty-field">
-                    <mat-label>Qty **</mat-label>
+                    <mat-label>Qty *</mat-label>
                     <input
                       matInput
                       type="number"
@@ -378,7 +379,7 @@ export interface InvoiceLineItem {
 
                   <!-- Unit Rate -->
                   <mat-form-field appearance="outline" class="rate-field">
-                    <mat-label>Rate (₹) **</mat-label>
+                    <mat-label>Rate (₹) *</mat-label>
                     <input
                       matInput
                       type="number"
@@ -635,6 +636,88 @@ export interface InvoiceLineItem {
       background: #111526 !important;
       border: 1px solid rgba(255, 255, 255, 0.08) !important;
     }
+
+    :host ::ng-deep {
+      .mat-mdc-form-field {
+        --mdc-outlined-text-field-input-text-color: #f8fafc !important;
+        --mdc-outlined-text-field-input-text-placeholder-color: #94a3b8 !important;
+        --mdc-outlined-text-field-label-text-color: #93c5fd !important;
+        --mdc-outlined-text-field-focus-label-text-color: #38bdf8 !important;
+        --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.22) !important;
+        --mdc-outlined-text-field-focus-outline-color: #38bdf8 !important;
+        --mdc-outlined-text-field-hover-outline-color: rgba(56, 189, 248, 0.5) !important;
+        --mdc-outlined-text-field-caret-color: #38bdf8 !important;
+
+        --mat-form-field-input-text-color: #f8fafc !important;
+        --mat-form-field-input-placeholder-color: #94a3b8 !important;
+        --mat-form-field-label-text-color: #93c5fd !important;
+        --mat-form-field-focus-label-text-color: #38bdf8 !important;
+
+        .mat-mdc-text-field-wrapper {
+          background-color: rgba(15, 23, 42, 0.6) !important;
+          border-radius: 8px !important;
+        }
+
+        input.mat-mdc-input-element,
+        textarea.mat-mdc-input-element {
+          color: #f8fafc !important;
+          -webkit-text-fill-color: #f8fafc !important;
+          caret-color: #38bdf8 !important;
+          font-size: 14px !important;
+          font-weight: 500 !important;
+        }
+
+        input.mat-mdc-input-element::placeholder,
+        textarea.mat-mdc-input-element::placeholder {
+          color: #94a3b8 !important;
+          -webkit-text-fill-color: #94a3b8 !important;
+          opacity: 1 !important;
+        }
+
+        .mat-mdc-floating-label,
+        .mdc-floating-label {
+          color: #93c5fd !important;
+        }
+
+        &.mat-focused .mat-mdc-floating-label,
+        &.mat-focused .mdc-floating-label {
+          color: #38bdf8 !important;
+        }
+
+        .mdc-notched-outline__leading,
+        .mdc-notched-outline__notch,
+        .mdc-notched-outline__trailing {
+          border-color: rgba(255, 255, 255, 0.22) !important;
+        }
+
+        &:hover .mdc-notched-outline__leading,
+        &:hover .mdc-notched-outline__notch,
+        &:hover .mdc-notched-outline__trailing {
+          border-color: rgba(56, 189, 248, 0.6) !important;
+        }
+
+        &.mat-focused .mdc-notched-outline__leading,
+        &.mat-focused .mdc-notched-outline__notch,
+        &.mat-focused .mdc-notched-outline__trailing {
+          border-color: #38bdf8 !important;
+          border-width: 2px !important;
+        }
+
+        .mat-mdc-form-field-hint {
+          color: #94a3b8 !important;
+        }
+
+        [matPrefix],
+        [matSuffix] {
+          color: #38bdf8 !important;
+        }
+
+        input[type='date']::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+          cursor: pointer;
+        }
+      }
+    }
     form {
       display: flex;
       flex-direction: column;
@@ -797,19 +880,19 @@ export interface InvoiceLineItem {
     }
     .product-name-field {
       flex: 3;
-      min-width: 200px;
+      min-width: 210px;
     }
     .hsn-field {
-      flex: 1.1;
-      min-width: 90px;
+      flex: 1;
+      min-width: 95px;
     }
     .qty-field {
-      flex: 1;
-      min-width: 75px;
+      flex: 0.8;
+      min-width: 70px;
     }
     .rate-field {
-      flex: 1.4;
-      min-width: 110px;
+      flex: 1.2;
+      min-width: 105px;
     }
 
     .line-total-box {

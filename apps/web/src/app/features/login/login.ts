@@ -23,6 +23,17 @@ import { AuthService } from '../../core/auth/auth.service';
   ],
   template: `
     <div class="login-container">
+      <div class="theme-bar">
+        <label class="theme-picker" aria-label="Select theme">
+          <mat-icon>palette</mat-icon>
+          <select [value]="selectedTheme()" (change)="changeTheme($any($event.target).value)">
+            @for (theme of themeOptions; track theme.value) {
+              <option [value]="theme.value">{{ theme.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
       <div class="login-card">
         <div class="login-header">
           <div class="logo-icon">₹</div>
@@ -122,12 +133,48 @@ import { AuthService } from '../../core/auth/auth.service';
   `,
   styles: [`
     .login-container {
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-      background: var(--bg-primary);
+      background: var(--page-bg);
       padding: 16px;
+    }
+
+    .theme-bar {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+    }
+
+    .theme-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.25);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      select {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        font-weight: 600;
+        outline: none;
+        cursor: pointer;
+      }
     }
 
     .login-card {
@@ -318,11 +365,39 @@ export default class Login {
   demoLoading = signal(false);
   showPassword = signal(false);
   errorMessage = signal('');
+  selectedTheme = signal<'light' | 'dark' | 'ocean' | 'forest' | 'sunset'>(this.getStoredTheme());
+
+  themeOptions = [
+    { value: 'dark', label: 'Dark' },
+    { value: 'light', label: 'Light' },
+    { value: 'ocean', label: 'Ocean' },
+    { value: 'forest', label: 'Forest' },
+    { value: 'sunset', label: 'Sunset' },
+  ];
 
   constructor(
     private authService: AuthService,
     private router: Router,
-  ) {}
+  ) {
+    this.applyTheme(this.selectedTheme());
+  }
+
+  changeTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
+    this.selectedTheme.set(theme);
+    this.applyTheme(theme);
+  }
+
+  private getStoredTheme(): 'light' | 'dark' | 'ocean' | 'forest' | 'sunset' {
+    const savedTheme = localStorage.getItem('hisaab-theme');
+    return savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'ocean' || savedTheme === 'forest' || savedTheme === 'sunset'
+      ? savedTheme
+      : 'dark';
+  }
+
+  private applyTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('hisaab-theme', theme);
+  }
 
   quickDemoLogin() {
     this.demoLoading.set(true);

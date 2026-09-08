@@ -72,6 +72,23 @@ html[data-theme='dark'] {
   --sidebar-active: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(168, 85, 247, 0.2));
   --topbar-bg: rgba(17, 24, 39, 0.8);
   --page-bg: linear-gradient(180deg, rgba(11, 16, 32, 0.98), rgba(15, 23, 42, 0.96));
+
+  /* Material Form Field dark theme tokens */
+  --mdc-outlined-text-field-input-text-color: #f8fafc;
+  --mdc-outlined-text-field-input-text-placeholder-color: #94a3b8;
+  --mdc-outlined-text-field-label-text-color: #93c5fd;
+  --mdc-outlined-text-field-focus-label-text-color: #38bdf8;
+  --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.22);
+  --mdc-outlined-text-field-focus-outline-color: #38bdf8;
+  --mdc-outlined-text-field-hover-outline-color: rgba(56, 189, 248, 0.5);
+  --mdc-outlined-text-field-caret-color: #38bdf8;
+
+  --mat-form-field-input-text-color: #f8fafc;
+  --mat-form-field-input-placeholder-color: #94a3b8;
+  --mat-form-field-label-text-color: #93c5fd;
+  --mat-form-field-focus-label-text-color: #38bdf8;
+  --mat-select-trigger-text-color: #f8fafc;
+  --mat-select-placeholder-text-color: #94a3b8;
 }
 
 html[data-theme='ocean'] {
@@ -265,6 +282,93 @@ html, body {
 
 .mat-mdc-form-field {
   width: 100%;
+}
+
+/* ─────────────────────────────────────────────────────────── */
+/* HIGH-CONTRAST VISIBILITY FOR FORM FIELDS IN DARK MODE / CARDS */
+/* ─────────────────────────────────────────────────────────── */
+html[data-theme='dark'] .mat-mdc-form-field,
+.form-card .mat-mdc-form-field,
+.section-box .mat-mdc-form-field {
+  --mdc-outlined-text-field-input-text-color: #f8fafc !important;
+  --mdc-outlined-text-field-input-text-placeholder-color: #94a3b8 !important;
+  --mdc-outlined-text-field-label-text-color: #93c5fd !important;
+  --mdc-outlined-text-field-focus-label-text-color: #38bdf8 !important;
+  --mdc-outlined-text-field-outline-color: rgba(255, 255, 255, 0.22) !important;
+  --mdc-outlined-text-field-focus-outline-color: #38bdf8 !important;
+  --mdc-outlined-text-field-hover-outline-color: rgba(56, 189, 248, 0.5) !important;
+  --mdc-outlined-text-field-caret-color: #38bdf8 !important;
+
+  --mat-form-field-input-text-color: #f8fafc !important;
+  --mat-form-field-input-placeholder-color: #94a3b8 !important;
+  --mat-form-field-label-text-color: #93c5fd !important;
+  --mat-form-field-focus-label-text-color: #38bdf8 !important;
+  --mat-select-trigger-text-color: #f8fafc !important;
+  --mat-select-placeholder-text-color: #94a3b8 !important;
+
+  .mat-mdc-text-field-wrapper {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    border-radius: 8px !important;
+  }
+
+  input.mat-mdc-input-element,
+  textarea.mat-mdc-input-element {
+    color: #f8fafc !important;
+    -webkit-text-fill-color: #f8fafc !important;
+    caret-color: #38bdf8 !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+  }
+
+  input.mat-mdc-input-element::placeholder,
+  textarea.mat-mdc-input-element::placeholder {
+    color: #94a3b8 !important;
+    -webkit-text-fill-color: #94a3b8 !important;
+    opacity: 1 !important;
+  }
+
+  .mat-mdc-floating-label,
+  .mdc-floating-label {
+    color: #93c5fd !important;
+  }
+
+  &.mat-focused .mat-mdc-floating-label,
+  &.mat-focused .mdc-floating-label {
+    color: #38bdf8 !important;
+  }
+
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: rgba(255, 255, 255, 0.22) !important;
+  }
+
+  &:hover .mdc-notched-outline__leading,
+  &:hover .mdc-notched-outline__notch,
+  &:hover .mdc-notched-outline__trailing {
+    border-color: rgba(56, 189, 248, 0.6) !important;
+  }
+
+  &.mat-focused .mdc-notched-outline__leading,
+  &.mat-focused .mdc-notched-outline__notch,
+  &.mat-focused .mdc-notched-outline__trailing {
+    border-color: #38bdf8 !important;
+    border-width: 2px !important;
+  }
+
+  .mat-mdc-form-field-hint {
+    color: #94a3b8 !important;
+  }
+
+  [matPrefix],
+  [matSuffix] {
+    color: #38bdf8 !important;
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
 }
 
 .mat-mdc-snack-bar-container {
