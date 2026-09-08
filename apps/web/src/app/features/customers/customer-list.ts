@@ -22,8 +22,8 @@ import { CustomersApiService } from '../../core/api/customers-api.service';
 
     <div class="card">
       <mat-form-field appearance="outline" class="search-field">
-        <mat-label>Search customers...</mat-label>
-        <input matInput [(ngModel)]="search" (ngModelChange)="onSearch()" placeholder="Name, phone, or GSTIN" />
+        <mat-label>Search customers by name, phone, or GSTIN...</mat-label>
+        <input matInput [(ngModel)]="search" (ngModelChange)="onSearch()" />
         <mat-icon matPrefix>search</mat-icon>
       </mat-form-field>
 

@@ -75,15 +75,6 @@ interface NavItem {
 
           <div class="spacer"></div>
 
-          <label class="theme-picker" aria-label="Select theme">
-            <mat-icon>palette</mat-icon>
-            <select [value]="selectedTheme()" (change)="changeTheme($any($event.target).value)">
-              @for (theme of themeOptions; track theme.value) {
-                <option [value]="theme.value">{{ theme.label }}</option>
-              }
-            </select>
-          </label>
-
           <div class="user-info">
             <mat-icon>account_circle</mat-icon>
             <span class="user-name">{{ authService.user()?.name }}</span>
@@ -232,35 +223,6 @@ interface NavItem {
       flex: 1;
     }
 
-    .theme-picker {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.25);
-      color: var(--text-primary);
-
-      mat-icon {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-      }
-
-      select {
-        appearance: none;
-        border: none;
-        background: transparent;
-        color: var(--text-primary);
-        font-size: 0.85rem;
-        font-weight: 600;
-        outline: none;
-        padding-right: 4px;
-        cursor: pointer;
-      }
-    }
-
     .user-info {
       display: flex;
       align-items: center;
@@ -303,24 +265,11 @@ interface NavItem {
       .content-area {
         padding: 16px;
       }
-
-      .theme-picker {
-        max-width: 120px;
-      }
     }
   `],
 })
 export class Shell {
   sidebarCollapsed = signal(false);
-  selectedTheme = signal<'light' | 'dark' | 'ocean' | 'forest' | 'sunset'>(this.getStoredTheme());
-
-  themeOptions = [
-    { value: 'dark', label: 'Dark' },
-    { value: 'light', label: 'Light' },
-    { value: 'ocean', label: 'Ocean' },
-    { value: 'forest', label: 'Forest' },
-    { value: 'sunset', label: 'Sunset' },
-  ];
 
   navItems: NavItem[] = [
     { icon: 'dashboard', label: 'Dashboard', route: '/dashboard' },
@@ -335,24 +284,8 @@ export class Shell {
   ];
 
   constructor(public authService: AuthService) {
-    this.applyTheme(this.selectedTheme());
-  }
-
-  changeTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
-    this.selectedTheme.set(theme);
-    this.applyTheme(theme);
-  }
-
-  private getStoredTheme(): 'light' | 'dark' | 'ocean' | 'forest' | 'sunset' {
-    const savedTheme = localStorage.getItem('hisaab-theme');
-    return savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'ocean' || savedTheme === 'forest' || savedTheme === 'sunset'
-      ? savedTheme
-      : 'dark';
-  }
-
-  private applyTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('hisaab-theme', theme);
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('hisaab-theme', 'dark');
   }
 
   toggleSidebar() {

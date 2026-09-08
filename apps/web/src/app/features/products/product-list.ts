@@ -39,12 +39,11 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
     <!-- Search Bar -->
     <div class="card search-card">
       <mat-form-field appearance="outline" class="search-field">
-        <mat-label>Search Products by Name or HSN...</mat-label>
+        <mat-label>Search products by name or HSN...</mat-label>
         <input
           matInput
           [(ngModel)]="searchQuery"
           (input)="onSearch()"
-          placeholder="e.g. CRUZE, SEDIMENT, MEMBRANE, PUMP"
         />
         <mat-icon matPrefix>search</mat-icon>
       </mat-form-field>
