@@ -263,6 +263,7 @@ export class Shell {
   navItems: NavItem[] = [
     { icon: 'dashboard', label: 'Dashboard', route: '/dashboard' },
     { icon: 'people', label: 'Customers', route: '/customers' },
+    { icon: 'inventory_2', label: 'Products', route: '/products' },
     { icon: 'receipt_long', label: 'Sales', route: '/sales' },
     { icon: 'shopping_cart', label: 'Purchases', route: '/purchases' },
     { icon: 'payments', label: 'Payments', route: '/payments' },

@@ -19,6 +19,8 @@ export const routes: Routes = [
       { path: 'customers/new', loadComponent: () => import('./features/customers/customer-form') },
       { path: 'customers/:id', loadComponent: () => import('./features/customers/customer-form') },
 
+      { path: 'products', loadComponent: () => import('./features/products/product-list') },
+
       { path: 'sales', loadComponent: () => import('./features/sales/invoice-list') },
       { path: 'sales/new', loadComponent: () => import('./features/sales/invoice-form') },
 

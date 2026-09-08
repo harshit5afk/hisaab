@@ -8,12 +8,15 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SalesApiService } from '../../core/api/sales-api.service';
 import { CustomersApiService } from '../../core/api/customers-api.service';
+import { ProductsApiService, Product } from '../../core/api/products-api.service';
 
 export interface InvoiceLineItem {
+  productId?: string;
   name: string;
   hsn: string;
   qty: number;
@@ -33,6 +36,7 @@ export interface InvoiceLineItem {
     MatButtonModule,
     MatIconModule,
     MatButtonToggleModule,
+    MatAutocompleteModule,
     MatSnackBarModule,
     MatTooltipModule,
   ],
@@ -48,14 +52,17 @@ export interface InvoiceLineItem {
 
     <div class="card form-card">
       <form [formGroup]="form" (ngSubmit)="save()">
-        <!-- Customer Selection / Creation Toggle -->
+
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- 1. CUSTOMER DETAILS                                   -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <div class="section-box customer-section">
           <div class="section-header">
             <span class="section-title">1. Customer Details</span>
             <div class="mode-toggles">
               <button
                 type="button"
-                mat-stroked-button
+                class="pill-toggle-btn"
                 [class.active-btn]="customerMode() === 'existing'"
                 (click)="setCustomerMode('existing')"
               >
@@ -64,7 +71,7 @@ export interface InvoiceLineItem {
               </button>
               <button
                 type="button"
-                mat-stroked-button
+                class="pill-toggle-btn"
                 [class.active-btn]="customerMode() === 'new'"
                 (click)="setCustomerMode('new')"
               >
@@ -81,7 +88,7 @@ export interface InvoiceLineItem {
                 <mat-select formControlName="customerId" (selectionChange)="onCustomerSelected($event.value)">
                   @for (c of customers(); track c.id) {
                     <mat-option [value]="c.id">
-                      {{ c.name }} {{ c.phone ? '(' + c.phone + ')' : '' }}
+                      {{ c.name }} {{ c.phone ? '(' + c.phone + ')' : '' }} {{ c.state ? '[' + c.state + ']' : '' }}
                     </mat-option>
                   }
                 </mat-select>
@@ -94,11 +101,16 @@ export interface InvoiceLineItem {
                     <strong>Phone:</strong> {{ selectedCustomer()?.phone || '—' }}
                   </div>
                   <div class="preview-item">
-                    <strong>Address:</strong> {{ selectedCustomer()?.address || '—' }}
+                    <strong>State (Place of Supply):</strong> {{ selectedCustomer()?.state || 'RAJASTHAN (Default)' }}
                   </div>
                   @if (selectedCustomer()?.gstin) {
                     <div class="preview-item">
                       <strong>GSTIN:</strong> {{ selectedCustomer()?.gstin }}
+                    </div>
+                  }
+                  @if (selectedCustomer()?.address) {
+                    <div class="preview-item">
+                      <strong>Address:</strong> {{ selectedCustomer()?.address }}
                     </div>
                   }
                 </div>
@@ -107,11 +119,11 @@ export interface InvoiceLineItem {
           } @else {
             <div class="new-customer-fields">
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Customer Name *</mat-label>
+                <mat-label>Customer Name **</mat-label>
                 <input
                   matInput
                   formControlName="customerName"
-                  placeholder="e.g. Ramesh Trading Co. or Harshit Vishwakarma"
+                  placeholder="e.g. Alnoor Water Solutions / Harshit Vishwakarma"
                   required
                 />
                 <mat-icon matPrefix>business</mat-icon>
@@ -126,7 +138,7 @@ export interface InvoiceLineItem {
                   <input
                     matInput
                     formControlName="customerPhone"
-                    placeholder="e.g. 9876543210"
+                    placeholder="e.g. 9829012345"
                     maxlength="15"
                   />
                   <mat-icon matPrefix>phone</mat-icon>
@@ -137,35 +149,48 @@ export interface InvoiceLineItem {
                   <input
                     matInput
                     formControlName="customerGstin"
-                    placeholder="e.g. 27AAAPA1234A1Z5"
+                    placeholder="e.g. 08ABCDE1234F1Z5"
                     maxlength="15"
                   />
                   <mat-icon matPrefix>receipt_long</mat-icon>
                 </mat-form-field>
               </div>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Billing Address (Optional)</mat-label>
-                <input
-                  matInput
-                  formControlName="customerAddress"
-                  placeholder="e.g. Shop 12, MG Road, Pune, Maharashtra"
-                />
-                <mat-icon matPrefix>location_on</mat-icon>
-              </mat-form-field>
+              <div class="grid-2">
+                <mat-form-field appearance="outline">
+                  <mat-label>State / Place of Supply (Optional)</mat-label>
+                  <input
+                    matInput
+                    formControlName="customerState"
+                    placeholder="e.g. RAJASTHAN, MAHARASHTRA"
+                  />
+                  <mat-icon matPrefix>map</mat-icon>
+                  <mat-hint>Used for CGST+SGST vs IGST calculation</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Billing Address (Optional)</mat-label>
+                  <input
+                    matInput
+                    formControlName="customerAddress"
+                    placeholder="e.g. Shop 4, Water Market, Jaipur"
+                  />
+                  <mat-icon matPrefix>location_on</mat-icon>
+                </mat-form-field>
+              </div>
             </div>
           }
         </div>
 
-        <!-- Products / Line Items Section -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- 2. PRODUCTS & SERVICES                                -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <div class="section-box items-section">
           <div class="section-header">
             <span class="section-title">2. Products & Services ({{ lineItems().length }} items)</span>
             <button
               type="button"
-              mat-flat-button
-              color="accent"
-              class="add-item-btn"
+              class="add-product-header-btn"
               (click)="addItem()"
             >
               <mat-icon>add</mat-icon>
@@ -179,33 +204,45 @@ export interface InvoiceLineItem {
                 <div class="item-index">{{ $index + 1 }}</div>
 
                 <div class="item-fields">
-                  <!-- Product Name -->
+                  <!-- Product Name with Catalog Autocomplete -->
                   <mat-form-field appearance="outline" class="product-name-field">
-                    <mat-label>Product / Service Name *</mat-label>
+                    <mat-label>Product / Service Name **</mat-label>
                     <input
                       matInput
                       [(ngModel)]="item.name"
                       [ngModelOptions]="{ standalone: true }"
+                      [matAutocomplete]="auto"
+                      (input)="filterProducts(item.name)"
                       (ngModelChange)="onItemUpdated($index)"
-                      placeholder="e.g. Cement 50kg, Steel Rods"
+                      placeholder="e.g. INLINE CRUZE SEDIMENT, PRE CARBON"
                       required
                     />
+                    <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onProductSelected($index, $event.option.value)">
+                      @for (p of filteredProducts(); track p.id) {
+                        <mat-option [value]="p">
+                          <div class="product-option-row">
+                            <span class="p-name">{{ p.name }}</span>
+                            <span class="p-rate">₹ {{ (p.rate / 100).toFixed(2) }}</span>
+                          </div>
+                        </mat-option>
+                      }
+                    </mat-autocomplete>
                   </mat-form-field>
 
                   <!-- HSN/SAC -->
                   <mat-form-field appearance="outline" class="hsn-field">
-                    <mat-label>HSN / SAC</mat-label>
+                    <mat-label>HSN / ...</mat-label>
                     <input
                       matInput
                       [(ngModel)]="item.hsn"
                       [ngModelOptions]="{ standalone: true }"
-                      placeholder="e.g. 2523"
+                      placeholder="e.g. 8421"
                     />
                   </mat-form-field>
 
                   <!-- Quantity -->
                   <mat-form-field appearance="outline" class="qty-field">
-                    <mat-label>Qty *</mat-label>
+                    <mat-label>Qty **</mat-label>
                     <input
                       matInput
                       type="number"
@@ -220,7 +257,7 @@ export interface InvoiceLineItem {
 
                   <!-- Unit Rate -->
                   <mat-form-field appearance="outline" class="rate-field">
-                    <mat-label>Rate (₹) *</mat-label>
+                    <mat-label>Rate (₹) **</mat-label>
                     <input
                       matInput
                       type="number"
@@ -236,7 +273,7 @@ export interface InvoiceLineItem {
 
                   <!-- Line Total -->
                   <div class="line-total-box">
-                    <span class="total-label">Total</span>
+                    <span class="total-label">TOTAL</span>
                     <span class="total-val">₹ {{ item.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </div>
 
@@ -257,19 +294,18 @@ export interface InvoiceLineItem {
             }
           </div>
 
-          <!-- Add Item Button at bottom of list -->
+          <!-- Add Item Button at bottom of list + Summary Bar -->
           <div class="items-footer">
             <button
               type="button"
-              mat-stroked-button
+              class="add-another-btn"
               (click)="addItem()"
-              class="add-more-btn"
             >
               <mat-icon>add_circle_outline</mat-icon>
               Add Another Product
             </button>
 
-            <!-- Grand Total Bar -->
+            <!-- Grand Total Bar matching screenshot -->
             <div class="grand-total-card">
               <div class="total-stat">
                 <span class="stat-label">Total Items:</span>
@@ -280,32 +316,153 @@ export interface InvoiceLineItem {
                 <span class="stat-value">{{ totalQuantity() }}</span>
               </div>
               <div class="total-stat grand-stat">
-                <span class="stat-label">Grand Total:</span>
-                <span class="stat-value">₹ {{ grandTotal().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                <span class="stat-label">Subtotal:</span>
+                <span class="stat-value badge-total">₹ {{ subtotal().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 3. Invoice Meta -->
-        <div class="section-box">
-          <span class="section-title" style="margin-bottom: 12px; display: block;">3. Invoice Details</span>
-          <div class="grid-2">
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- 3. INVOICE & TAX DETAILS                              -->
+        <!-- ══════════════════════════════════════════════════════ -->
+        <div class="section-box invoice-details-section">
+          <div class="section-header">
+            <span class="section-title">3. Invoice Details</span>
+
+            <!-- GST Toggle Buttons -->
+            <div class="gst-toggle-group">
+              <button
+                type="button"
+                class="gst-btn"
+                [class.active-gst]="!isGstInvoice()"
+                (click)="setGst(false)"
+              >
+                Without GST
+              </button>
+              <button
+                type="button"
+                class="gst-btn"
+                [class.active-gst]="isGstInvoice()"
+                (click)="setGst(true)"
+              >
+                <mat-icon>verified</mat-icon>
+                With GST (Tax Invoice)
+              </button>
+            </div>
+          </div>
+
+          @if (isGstInvoice()) {
+            <!-- Tax Configuration & Dynamic Breakdown -->
+            <div class="gst-config-box">
+              <div class="grid-2">
+                <mat-form-field appearance="outline">
+                  <mat-label>GST Tax Slab / Rate</mat-label>
+                  <mat-select formControlName="taxRate" (selectionChange)="recalculateGrandTotal()">
+                    <mat-option [value]="18">18% GST (Standard for RO & Parts)</mat-option>
+                    <mat-option [value]="12">12% GST</mat-option>
+                    <mat-option [value]="5">5% GST</mat-option>
+                    <mat-option [value]="28">28% GST</mat-option>
+                    <mat-option [value]="0">0% GST (Nil Rated)</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Other Charges / Freight / Extra (₹)</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="0"
+                    step="1"
+                    formControlName="otherAmountRupees"
+                    (input)="recalculateGrandTotal()"
+                    placeholder="0.00"
+                  />
+                  <span matPrefix>₹&nbsp;</span>
+                </mat-form-field>
+              </div>
+
+              <!-- Live Tax Breakdown Card -->
+              <div class="tax-breakdown-card">
+                <div class="breakdown-title">
+                  <mat-icon>receipt</mat-icon>
+                  <span>TAX BREAKUP ({{ isSameState() ? 'INTRA-STATE: CGST + SGST' : 'INTER-STATE: IGST' }})</span>
+                </div>
+                <div class="breakdown-rows">
+                  <div class="b-row">
+                    <span>Taxable Subtotal (Goods):</span>
+                    <strong>₹ {{ subtotal().toFixed(2) }}</strong>
+                  </div>
+
+                  @if (isSameState()) {
+                    <div class="b-row">
+                      <span>CGST ({{ (form.get('taxRate')?.value / 2) }}%):</span>
+                      <strong>₹ {{ cgst().toFixed(2) }}</strong>
+                    </div>
+                    <div class="b-row">
+                      <span>SGST ({{ (form.get('taxRate')?.value / 2) }}%):</span>
+                      <strong>₹ {{ sgst().toFixed(2) }}</strong>
+                    </div>
+                  } @else {
+                    <div class="b-row">
+                      <span>IGST ({{ form.get('taxRate')?.value }}%):</span>
+                      <strong>₹ {{ igst().toFixed(2) }}</strong>
+                    </div>
+                  }
+
+                  @if (otherAmount() > 0) {
+                    <div class="b-row">
+                      <span>Other Charges / Freight:</span>
+                      <strong>₹ {{ otherAmount().toFixed(2) }}</strong>
+                    </div>
+                  }
+
+                  <div class="b-row grand-row">
+                    <span>Grand Total Due:</span>
+                    <strong class="highlight-grand">₹ {{ finalGrandTotal().toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="non-gst-box">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Other Charges / Freight / Extra (₹) (Optional)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  min="0"
+                  step="1"
+                  formControlName="otherAmountRupees"
+                  (input)="recalculateGrandTotal()"
+                  placeholder="0.00"
+                />
+                <span matPrefix>₹&nbsp;</span>
+              </mat-form-field>
+            </div>
+          }
+
+          <div class="grid-2" style="margin-top: 10px;">
             <mat-form-field appearance="outline">
-              <mat-label>Invoice Date</mat-label>
-              <input matInput type="date" formControlName="date" />
+              <mat-label>Invoice Date *</mat-label>
+              <input matInput type="date" formControlName="date" required />
             </mat-form-field>
 
             <mat-form-field appearance="outline">
-              <mat-label>Total Invoice Amount (₹) *</mat-label>
-              <input matInput type="number" formControlName="amountRupees" min="0.01" step="0.01" />
+              <mat-label>Total Invoice Amount (₹) **</mat-label>
+              <input
+                matInput
+                type="number"
+                [value]="finalGrandTotal()"
+                readonly
+              />
               <span matPrefix>₹&nbsp;</span>
-              <mat-hint>Calculated automatically from products above</mat-hint>
+              <mat-hint>Calculated automatically from items & tax</mat-hint>
             </mat-form-field>
           </div>
 
           <mat-form-field appearance="outline" class="full-width" style="margin-top: 8px;">
-            <mat-label>Description / Overall Notes (Optional)</mat-label>
+            <mat-label>Description / Item Notes (Optional)</mat-label>
             <textarea
               matInput
               formControlName="description"
@@ -315,16 +472,19 @@ export interface InvoiceLineItem {
           </mat-form-field>
         </div>
 
+        <!-- ══════════════════════════════════════════════════════ -->
+        <!-- ACTIONS                                               -->
+        <!-- ══════════════════════════════════════════════════════ -->
         <div class="form-actions">
-          <button mat-button type="button" (click)="router.navigate(['/sales'])">Cancel</button>
+          <button mat-button type="button" class="cancel-btn" (click)="router.navigate(['/sales'])">Cancel</button>
           <button
             mat-flat-button
-            color="primary"
+            class="submit-btn"
             type="submit"
             [disabled]="form.invalid || isSubmitting() || !isItemsValid()"
           >
             @if (isSubmitting()) {
-              <span>Saving...</span>
+              <span>Saving Invoice...</span>
             } @else {
               <span>Create Invoice</span>
             }
@@ -348,11 +508,11 @@ export interface InvoiceLineItem {
       font-weight: 600;
     }
     .form-card {
-      max-width: 860px;
+      max-width: 920px;
       padding: 24px;
       border-radius: 12px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-color);
+      background: var(--bg-card, #131722);
+      border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
     }
     form {
       display: flex;
@@ -360,8 +520,8 @@ export interface InvoiceLineItem {
       gap: 20px;
     }
     .section-box {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
+      background: var(--bg-secondary, #1a202c);
+      border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
       border-radius: 12px;
       padding: 20px;
     }
@@ -376,27 +536,48 @@ export interface InvoiceLineItem {
     .section-title {
       font-size: 13px;
       font-weight: 700;
-      color: var(--accent-indigo);
+      color: #93c5fd;
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+
+    /* Pill buttons for customer mode */
     .mode-toggles {
       display: flex;
       gap: 8px;
     }
-    .mode-toggles button {
+    .pill-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-secondary, #94a3b8);
       font-size: 12px;
-      height: 34px;
-      line-height: 32px;
-      padding: 0 12px;
-      border-color: rgba(255, 255, 255, 0.15);
-      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      &.active-btn {
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
+      }
     }
-    .active-btn {
-      background: #2563eb !important;
-      color: #ffffff !important;
-      border-color: #3b82f6 !important;
-    }
+
     .full-width {
       width: 100%;
     }
@@ -405,22 +586,51 @@ export interface InvoiceLineItem {
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
+
     .customer-preview {
       display: flex;
       flex-wrap: wrap;
       gap: 16px;
       padding: 12px 16px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
       border-radius: 8px;
       font-size: 13px;
-      color: var(--text-secondary);
-    }
-    .customer-preview strong {
-      color: var(--text-primary);
+      color: var(--text-secondary, #94a3b8);
+
+      strong {
+        color: #f1f5f9;
+      }
     }
 
-    /* Items Section Styling */
+    /* Add Product Header button matching screenshot */
+    .add-product-header-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      border-radius: 18px;
+      background: #93c5fd;
+      color: #0f172a;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      &:hover {
+        background: #bfdbfe;
+        transform: translateY(-1px);
+      }
+    }
+
+    /* Line items list */
     .items-list {
       display: flex;
       flex-direction: column;
@@ -429,27 +639,28 @@ export interface InvoiceLineItem {
     .item-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-color);
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 8px;
-      padding: 8px 12px;
+      padding: 10px 14px;
       transition: border-color 0.15s ease;
-    }
-    .item-row:hover {
-      border-color: rgba(255, 255, 255, 0.18);
+
+      &:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+      }
     }
     .item-index {
       width: 24px;
       height: 24px;
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.1);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 11px;
       font-weight: 700;
-      color: var(--accent-indigo);
+      color: #93c5fd;
       flex-shrink: 0;
     }
     .item-fields {
@@ -458,16 +669,17 @@ export interface InvoiceLineItem {
       gap: 8px;
       flex: 1;
       flex-wrap: wrap;
-    }
-    .item-fields mat-form-field {
-      margin-bottom: -16px;
+
+      mat-form-field {
+        margin-bottom: -16px;
+      }
     }
     .product-name-field {
       flex: 3;
-      min-width: 180px;
+      min-width: 200px;
     }
     .hsn-field {
-      flex: 1.2;
+      flex: 1.1;
       min-width: 90px;
     }
     .qty-field {
@@ -478,6 +690,7 @@ export interface InvoiceLineItem {
       flex: 1.4;
       min-width: 110px;
     }
+
     .line-total-box {
       display: flex;
       flex-direction: column;
@@ -487,20 +700,37 @@ export interface InvoiceLineItem {
       padding: 0 8px;
     }
     .total-label {
-      font-size: 10px;
-      color: var(--text-secondary);
+      font-size: 9px;
+      color: var(--text-secondary, #94a3b8);
       text-transform: uppercase;
-      font-weight: 600;
+      font-weight: 700;
       letter-spacing: 0.5px;
     }
     .total-val {
       font-size: 15px;
       font-weight: 700;
-      color: var(--accent-green);
+      color: #38bdf8;
     }
     .remove-btn {
       flex-shrink: 0;
     }
+
+    .product-option-row {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      gap: 16px;
+
+      .p-name {
+        font-weight: 500;
+      }
+      .p-rate {
+        color: #38bdf8;
+        font-weight: 600;
+      }
+    }
+
+    /* Items Footer matching screenshot */
     .items-footer {
       display: flex;
       justify-content: space-between;
@@ -509,19 +739,40 @@ export interface InvoiceLineItem {
       flex-wrap: wrap;
       gap: 12px;
     }
-    .add-more-btn {
-      font-size: 13px;
-      border-color: rgba(255, 255, 255, 0.15);
-      color: var(--text-primary);
+    .add-another-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: transparent;
+      color: #f1f5f9;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
     }
+
+    /* Grand Total Card with highlighted blue badge */
     .grand-total-card {
       display: flex;
       align-items: center;
       gap: 16px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 8px;
-      padding: 10px 18px;
+      padding: 8px 16px;
     }
     .total-stat {
       display: flex;
@@ -530,16 +781,110 @@ export interface InvoiceLineItem {
       font-size: 13px;
     }
     .stat-label {
-      color: var(--text-secondary);
+      color: #94a3b8;
     }
     .stat-value {
-      font-weight: 600;
-      color: var(--text-primary);
+      font-weight: 700;
+      color: #f8fafc;
+      font-size: 15px;
     }
-    .grand-stat .stat-value {
-      font-size: 16px;
+    .badge-total {
+      background: #1e3a8a;
+      border: 1px solid #3b82f6;
+      color: #60a5fa !important;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 15px;
       font-weight: 800;
-      color: var(--accent-indigo);
+    }
+
+    /* GST Toggle Buttons */
+    .gst-toggle-group {
+      display: flex;
+      gap: 8px;
+    }
+    .gst-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+
+      &.active-gst {
+        background: #0284c7 !important;
+        color: #ffffff !important;
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 10px rgba(2, 132, 199, 0.3);
+      }
+    }
+
+    /* Tax Breakdown Box */
+    .gst-config-box {
+      background: rgba(2, 132, 199, 0.06);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .tax-breakdown-card {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 14px;
+      margin-top: 10px;
+    }
+    .breakdown-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+    .breakdown-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .b-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #cbd5e1;
+
+      &.grand-row {
+        margin-top: 6px;
+        padding-top: 8px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.15);
+        font-size: 15px;
+        font-weight: 700;
+      }
+    }
+    .highlight-grand {
+      color: #38bdf8;
+      font-size: 18px;
     }
 
     .form-actions {
@@ -548,15 +893,23 @@ export interface InvoiceLineItem {
       gap: 12px;
       margin-top: 8px;
     }
+    .cancel-btn {
+      color: #94a3b8;
+    }
+    .submit-btn {
+      background: #0284c7 !important;
+      color: #ffffff !important;
+      padding: 0 24px;
+      font-weight: 700;
 
-    mat-icon[matPrefix] {
-      color: var(--accent-indigo) !important;
-      margin-right: 8px;
+      &:hover {
+        background: #0369a1 !important;
+      }
     }
 
-    input::placeholder,
-    textarea::placeholder {
-      color: rgba(255, 255, 255, 0.38) !important;
+    mat-icon[matPrefix] {
+      color: #38bdf8 !important;
+      margin-right: 8px;
     }
 
     @media (max-width: 768px) {
@@ -583,9 +936,12 @@ export interface InvoiceLineItem {
 export default class InvoiceForm implements OnInit {
   form: FormGroup;
   customers = signal<any[]>([]);
+  allProducts = signal<Product[]>([]);
+  filteredProducts = signal<Product[]>([]);
   customerMode = signal<'existing' | 'new'>('existing');
   selectedCustomer = signal<any | null>(null);
   isSubmitting = signal<boolean>(false);
+  isGstInvoice = signal<boolean>(false);
 
   // Dynamic Product Line Items
   lineItems = signal<InvoiceLineItem[]>([
@@ -596,14 +952,57 @@ export default class InvoiceForm implements OnInit {
     return this.lineItems().reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
   });
 
-  grandTotal = computed(() => {
+  subtotal = computed(() => {
     return this.lineItems().reduce((acc, item) => acc + (Number(item.total) || 0), 0);
+  });
+
+  otherAmount = computed(() => {
+    return Number(this.form?.get('otherAmountRupees')?.value) || 0;
+  });
+
+  isSameState = computed(() => {
+    const customerState = (
+      this.customerMode() === 'existing'
+        ? this.selectedCustomer()?.state
+        : this.form?.get('customerState')?.value
+    )?.trim().toUpperCase() || 'RAJASTHAN';
+    const businessState = 'RAJASTHAN';
+    return customerState === businessState;
+  });
+
+  totalTax = computed(() => {
+    if (!this.isGstInvoice()) return 0;
+    const rate = Number(this.form?.get('taxRate')?.value) || 0;
+    return Math.round(this.subtotal() * rate) / 100;
+  });
+
+  cgst = computed(() => {
+    if (!this.isGstInvoice() || !this.isSameState()) return 0;
+    return Math.round((this.totalTax() / 2) * 100) / 100;
+  });
+
+  sgst = computed(() => {
+    if (!this.isGstInvoice() || !this.isSameState()) return 0;
+    return Math.round((this.totalTax() - this.cgst()) * 100) / 100;
+  });
+
+  igst = computed(() => {
+    if (!this.isGstInvoice() || this.isSameState()) return 0;
+    return this.totalTax();
+  });
+
+  finalGrandTotal = computed(() => {
+    const goods = this.subtotal();
+    const tax = this.totalTax();
+    const other = this.otherAmount();
+    return Math.round((goods + tax + other) * 100) / 100;
   });
 
   constructor(
     private fb: FormBuilder,
     private salesApi: SalesApiService,
     private customersApi: CustomersApiService,
+    private productsApi: ProductsApiService,
     public router: Router,
     private snackBar: MatSnackBar,
   ) {
@@ -613,16 +1012,25 @@ export default class InvoiceForm implements OnInit {
       // New customer fields
       customerName: [''],
       customerPhone: [''],
-      customerAddress: [''],
       customerGstin: [''],
+      customerState: ['RAJASTHAN'],
+      customerAddress: [''],
+      // GST & Taxes
+      isGstInvoice: [false],
+      taxRate: [18],
+      otherAmountRupees: [0],
       // Invoice details
       date: [new Date().toISOString().split('T')[0], Validators.required],
-      amountRupees: [0, [Validators.required, Validators.min(0.01)]],
       description: [''],
     });
   }
 
   ngOnInit() {
+    this.loadCustomers();
+    this.loadProducts();
+  }
+
+  private loadCustomers() {
     this.customersApi.findAll({ limit: 100 }).subscribe({
       next: (res) => {
         const list = res?.data || [];
@@ -633,10 +1041,43 @@ export default class InvoiceForm implements OnInit {
           this.setCustomerMode('existing');
         }
       },
-      error: () => {
-        this.setCustomerMode('new');
+      error: () => this.setCustomerMode('new'),
+    });
+  }
+
+  private loadProducts() {
+    this.productsApi.findAll({ limit: 200 }).subscribe({
+      next: (res) => {
+        const list = res?.data || [];
+        this.allProducts.set(list);
+        this.filteredProducts.set(list.slice(0, 10));
       },
     });
+  }
+
+  filterProducts(query: string) {
+    if (!query || !query.trim()) {
+      this.filteredProducts.set(this.allProducts().slice(0, 10));
+      return;
+    }
+    const q = query.toLowerCase();
+    const matches = this.allProducts().filter(
+      (p) => p.name.toLowerCase().includes(q) || (p.hsn && p.hsn.includes(q)),
+    );
+    this.filteredProducts.set(matches.slice(0, 15));
+  }
+
+  onProductSelected(index: number, product: Product) {
+    const items = [...this.lineItems()];
+    items[index] = {
+      ...items[index],
+      productId: product.id,
+      name: product.name,
+      hsn: product.hsn || '',
+      rate: product.rate / 100, // convert paise to rupees
+      total: Math.round(items[index].qty * (product.rate / 100) * 100) / 100,
+    };
+    this.lineItems.set(items);
   }
 
   setCustomerMode(mode: 'existing' | 'new') {
@@ -660,11 +1101,24 @@ export default class InvoiceForm implements OnInit {
     this.selectedCustomer.set(found || null);
   }
 
+  setGst(isGst: boolean) {
+    this.isGstInvoice.set(isGst);
+    this.form.patchValue({ isGstInvoice: isGst });
+    if (!isGst) {
+      this.form.patchValue({ taxRate: 0 });
+    } else {
+      this.form.patchValue({ taxRate: 18 });
+    }
+  }
+
+  recalculateGrandTotal() {
+    // computed signals update automatically
+  }
+
   addItem() {
     const items = [...this.lineItems()];
     items.push({ name: '', hsn: '', qty: 1, rate: 0, total: 0 });
     this.lineItems.set(items);
-    this.syncTotal();
   }
 
   removeItem(index: number) {
@@ -672,7 +1126,6 @@ export default class InvoiceForm implements OnInit {
     const items = [...this.lineItems()];
     items.splice(index, 1);
     this.lineItems.set(items);
-    this.syncTotal();
   }
 
   onItemUpdated(index: number) {
@@ -682,12 +1135,6 @@ export default class InvoiceForm implements OnInit {
     const rate = Number(item.rate) || 0;
     item.total = Math.round(qty * rate * 100) / 100;
     this.lineItems.set(items);
-    this.syncTotal();
-  }
-
-  private syncTotal() {
-    const total = this.grandTotal();
-    this.form.patchValue({ amountRupees: total });
   }
 
   isItemsValid(): boolean {
@@ -705,6 +1152,7 @@ export default class InvoiceForm implements OnInit {
     const v = this.form.value;
 
     const itemsPayload = this.lineItems().map((i) => ({
+      productId: i.productId || undefined,
       name: i.name.trim(),
       hsn: i.hsn?.trim() || undefined,
       qty: Number(i.qty),
@@ -712,9 +1160,14 @@ export default class InvoiceForm implements OnInit {
       total: Number(i.total),
     }));
 
+    const isGst = this.isGstInvoice();
+    const otherPaise = Math.round((Number(v.otherAmountRupees) || 0) * 100);
+
     const payload: any = {
       date: v.date,
-      amount: Math.round(Number(v.amountRupees) * 100), // convert ₹ to paise
+      isGstInvoice: isGst,
+      taxRate: isGst ? Number(v.taxRate) || 18 : 0,
+      otherAmount: otherPaise,
       description: v.description?.trim() || undefined,
       items: itemsPayload,
     };
@@ -726,6 +1179,7 @@ export default class InvoiceForm implements OnInit {
       payload.customerPhone = v.customerPhone?.trim() || undefined;
       payload.customerAddress = v.customerAddress?.trim() || undefined;
       payload.customerGstin = v.customerGstin?.trim() || undefined;
+      payload.customerState = v.customerState?.trim() || 'RAJASTHAN';
     }
 
     this.salesApi.create(payload).subscribe({

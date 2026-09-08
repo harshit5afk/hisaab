@@ -27,6 +27,9 @@ import { SalesApiService } from '../../core/api/sales-api.service';
           <th mat-header-cell *matHeaderCellDef>Invoice #</th>
           <td mat-cell *matCellDef="let i">
             <span class="invoice-no">{{ i.invoiceNo }}</span>
+            @if (i.isGstInvoice) {
+              <span class="gst-badge">TAX INVOICE</span>
+            }
           </td>
         </ng-container>
 
@@ -41,8 +44,13 @@ import { SalesApiService } from '../../core/api/sales-api.service';
         </ng-container>
 
         <ng-container matColumnDef="amount">
-          <th mat-header-cell *matHeaderCellDef>Amount</th>
-          <td mat-cell *matCellDef="let i" class="amount-cell">{{ i.amount | paiseToRupees }}</td>
+          <th mat-header-cell *matHeaderCellDef>Total Due</th>
+          <td mat-cell *matCellDef="let i" class="amount-cell">
+            <div>{{ (i.totalAmount || i.amount) | paiseToRupees }}</div>
+            @if (i.isGstInvoice && (i.cgst > 0 || i.sgst > 0 || i.igst > 0)) {
+              <div class="tax-subtext">Tax: ₹{{ ((i.cgst + i.sgst + i.igst) / 100).toFixed(2) }}</div>
+            }
+          </td>
         </ng-container>
 
         <ng-container matColumnDef="status">
@@ -72,7 +80,19 @@ import { SalesApiService } from '../../core/api/sales-api.service';
   styles: [`
     .full-width { width: 100%; }
     .invoice-no { font-family: monospace; font-weight: 600; color: var(--accent-indigo); }
+    .gst-badge {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 6px;
+      font-size: 10px;
+      font-weight: 800;
+      border-radius: 4px;
+      background: #0369a1;
+      color: #e0f2fe;
+      letter-spacing: 0.5px;
+    }
     .amount-cell { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .tax-subtext { font-size: 11px; color: #94a3b8; font-weight: normal; }
   `],
 })
 export default class InvoiceList implements OnInit {

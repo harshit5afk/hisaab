@@ -37,12 +37,21 @@ import { SalesApiService } from '../../core/api/sales-api.service';
           <mat-select formControlName="mode">
             <mat-option value="CASH">Cash</mat-option>
             <mat-option value="UPI">UPI</mat-option>
-            <mat-option value="BANK_TRANSFER">Bank Transfer</mat-option>
+            <mat-option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS/IMPS)</mat-option>
             <mat-option value="CHEQUE">Cheque</mat-option>
             <mat-option value="OTHER">Other</mat-option>
           </mat-select>
         </mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Note</mat-label><input matInput formControlName="note" /></mat-form-field>
+
+        @if (form.get('mode')?.value === 'BANK_TRANSFER' || form.get('mode')?.value === 'CHEQUE') {
+          <mat-form-field appearance="outline">
+            <mat-label>Bank Account / Deposited In</mat-label>
+            <input matInput formControlName="bankAccountName" placeholder="e.g. Axis Bank - 9120, SBI Current" />
+            <mat-hint>Account where payment was received</mat-hint>
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline"><mat-label>Note / Transaction Ref</mat-label><input matInput formControlName="note" placeholder="e.g. UTR # or Cheque #" /></mat-form-field>
         <div class="form-actions">
           <button mat-button type="button" (click)="router.navigate(['/payments'])">Cancel</button>
           <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid">Record Payment</button>
@@ -58,8 +67,13 @@ export default class PaymentForm implements OnInit {
   invoices = signal<any[]>([]);
   constructor(private fb: FormBuilder, private api: PaymentsApiService, private customersApi: CustomersApiService, private salesApi: SalesApiService, public router: Router, private snackBar: MatSnackBar) {
     this.form = this.fb.group({
-      customerId: ['', Validators.required], invoiceId: [''], date: [new Date().toISOString().split('T')[0], Validators.required],
-      amountRupees: [null, [Validators.required, Validators.min(0.01)]], mode: ['CASH', Validators.required], note: [''],
+      customerId: ['', Validators.required],
+      invoiceId: [''],
+      date: [new Date().toISOString().split('T')[0], Validators.required],
+      amountRupees: [null, [Validators.required, Validators.min(0.01)]],
+      mode: ['CASH', Validators.required],
+      bankAccountName: [''],
+      note: [''],
     });
   }
   ngOnInit() { this.customersApi.findAll({ limit: 100 }).subscribe((r) => this.customers.set(r.data)); }
@@ -69,7 +83,15 @@ export default class PaymentForm implements OnInit {
   }
   save() {
     const v = this.form.value;
-    this.api.create({ customerId: v.customerId, invoiceId: v.invoiceId || undefined, date: v.date, amount: Math.round(v.amountRupees * 100), mode: v.mode, note: v.note }).subscribe({
+    this.api.create({
+      customerId: v.customerId,
+      invoiceId: v.invoiceId || undefined,
+      date: v.date,
+      amount: Math.round(v.amountRupees * 100),
+      mode: v.mode,
+      bankAccountName: v.bankAccountName?.trim() || undefined,
+      note: v.note,
+    }).subscribe({
       next: () => { this.snackBar.open('Payment recorded', 'OK', { duration: 3000 }); this.router.navigate(['/payments']); },
       error: (err) => this.snackBar.open(err.error?.message || 'Failed', 'OK', { duration: 3000 }),
     });
