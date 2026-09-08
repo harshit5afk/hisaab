@@ -111,7 +111,7 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let p" class="action-cell">
-            <button mat-icon-button color="warn" (click)="deleteProduct(p.id)" matTooltip="Delete product">
+            <button mat-icon-button color="warn" (click)="openDeleteModal(p)" matTooltip="Delete product">
               <mat-icon>delete_outline</mat-icon>
             </button>
           </td>
@@ -128,6 +128,47 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
         </div>
       }
     </div>
+
+    <!-- ── Product Delete Confirmation Modal ── -->
+    @if (productToDelete()) {
+      <div class="modal-backdrop" (click)="closeDeleteModal()">
+        <div class="modal-card delete-modal-card" (click)="$event.stopPropagation()">
+          <div class="modal-header delete-header">
+            <div class="header-info">
+              <div class="warn-icon-bubble">
+                <mat-icon>warning</mat-icon>
+              </div>
+              <h2>Remove Product?</h2>
+            </div>
+            <button mat-icon-button (click)="closeDeleteModal()" class="close-btn" [disabled]="isDeleting()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <p class="delete-msg">
+              Are you sure you want to remove <strong>{{ productToDelete()?.name }}</strong> from your catalog?
+            </p>
+          </div>
+
+          <div class="modal-footer">
+            <button mat-button type="button" (click)="closeDeleteModal()" [disabled]="isDeleting()">
+              Cancel
+            </button>
+            <button
+              mat-flat-button
+              color="warn"
+              (click)="executeDelete()"
+              [disabled]="isDeleting()"
+              class="confirm-delete-btn"
+            >
+              <mat-icon>delete</mat-icon>
+              <span>{{ isDeleting() ? 'Removing...' : 'Yes, Remove' }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     .page-header {
@@ -225,6 +266,8 @@ export default class ProductList implements OnInit {
   total = signal<number>(0);
   searchQuery = '';
   showCreate = signal<boolean>(false);
+  productToDelete = signal<Product | null>(null);
+  isDeleting = signal<boolean>(false);
   displayedColumns = ['name', 'hsn', 'unit', 'rate', 'actions'];
 
   newProd = {
@@ -285,17 +328,31 @@ export default class ProductList implements OnInit {
       });
   }
 
-  deleteProduct(id: string) {
-    if (confirm('Remove this product from catalog?')) {
-      this.productsApi.delete(id).subscribe({
-        next: () => {
-          this.snackBar.open('Product removed', 'OK', { duration: 3000 });
-          this.load();
-        },
-        error: (err) => {
-          this.snackBar.open(err.error?.message || 'Cannot delete', 'OK', { duration: 3000 });
-        },
-      });
-    }
+  openDeleteModal(product: Product) {
+    this.productToDelete.set(product);
+  }
+
+  closeDeleteModal() {
+    if (this.isDeleting()) return;
+    this.productToDelete.set(null);
+  }
+
+  executeDelete() {
+    const product = this.productToDelete();
+    if (!product) return;
+
+    this.isDeleting.set(true);
+    this.productsApi.delete(product.id).subscribe({
+      next: () => {
+        this.isDeleting.set(false);
+        this.productToDelete.set(null);
+        this.snackBar.open(`"${product.name}" removed from catalog`, 'OK', { duration: 3000 });
+        this.load();
+      },
+      error: (err) => {
+        this.isDeleting.set(false);
+        this.snackBar.open(err.error?.message || 'Cannot delete product', 'OK', { duration: 3000 });
+      },
+    });
   }
 }
