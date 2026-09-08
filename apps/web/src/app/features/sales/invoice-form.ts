@@ -125,6 +125,19 @@ export interface InvoiceLineItem {
                   (optionSelected)="onCustomerAutocompleteSelected($event.option.value)"
                   class="custom-dark-autocomplete"
                 >
+                  <!-- Count Header showing how many customers found -->
+                  @if (customerSearchQuery()) {
+                    <div class="dropdown-count-header">
+                      <span class="count-badge">{{ filteredCustomers().length }}</span>
+                      <span>{{ filteredCustomers().length }} Customer{{ filteredCustomers().length === 1 ? '' : 's' }} found for "{{ customerSearchQuery() }}"</span>
+                    </div>
+                  } @else {
+                    <div class="dropdown-count-header">
+                      <span class="count-badge">{{ filteredCustomers().length }}</span>
+                      <span>Showing all {{ filteredCustomers().length }} saved customers</span>
+                    </div>
+                  }
+
                   @for (c of filteredCustomers(); track c.id) {
                     <mat-option [value]="c" class="customer-mat-option">
                       <div class="customer-dropdown-option">
@@ -147,11 +160,17 @@ export interface InvoiceLineItem {
                   }
                   @if (filteredCustomers().length === 0) {
                     <mat-option disabled class="no-result-option">
-                      <span class="no-match-text">No customer found. Click '+ New Customer' to add.</span>
+                      <span class="no-match-text">No customer found matching "{{ customerSearchQuery() }}". Click '+ New Customer' to add.</span>
                     </mat-option>
                   }
                 </mat-autocomplete>
-                <mat-hint>Choose from your saved customer list or type any letter to filter</mat-hint>
+                @if (customerSearchQuery()) {
+                  <mat-hint class="match-hint">
+                    Found <strong>{{ filteredCustomers().length }}</strong> customer{{ filteredCustomers().length === 1 ? '' : 's' }} matching "{{ customerSearchQuery() }}"
+                  </mat-hint>
+                } @else {
+                  <mat-hint>Choose from your saved customer list or type any letter to filter</mat-hint>
+                }
               </mat-form-field>
 
               @if (selectedCustomer()) {
@@ -292,10 +311,24 @@ export interface InvoiceLineItem {
                     </button>
                     <mat-autocomplete
                       #productAuto="matAutocomplete"
+                      [panelWidth]="'500px'"
                       [displayWith]="displayProductFn"
                       (optionSelected)="onProductSelected($index, $event.option.value)"
-                      class="custom-dark-autocomplete"
+                      class="custom-dark-autocomplete product-autocomplete-panel"
                     >
+                      <!-- Count Header showing how many products found -->
+                      @if (productSearchQuery()) {
+                        <div class="dropdown-count-header">
+                          <span class="count-badge">{{ filteredProducts().length }}</span>
+                          <span>{{ filteredProducts().length }} Product{{ filteredProducts().length === 1 ? '' : 's' }} found for "{{ productSearchQuery() }}"</span>
+                        </div>
+                      } @else {
+                        <div class="dropdown-count-header">
+                          <span class="count-badge">{{ filteredProducts().length }}</span>
+                          <span>Showing {{ filteredProducts().length }} products in catalog</span>
+                        </div>
+                      }
+
                       @for (p of filteredProducts(); track p.id) {
                         <mat-option [value]="p" class="product-mat-option">
                           <div class="product-option-row">
@@ -311,7 +344,7 @@ export interface InvoiceLineItem {
                       }
                       @if (filteredProducts().length === 0) {
                         <mat-option disabled class="no-result-option">
-                          <span class="no-result-text">No product found in catalog. You can type custom name.</span>
+                          <span class="no-result-text">No product found matching "{{ productSearchQuery() }}". You can type custom name.</span>
                         </mat-option>
                       }
                     </mat-autocomplete>
@@ -599,8 +632,8 @@ export interface InvoiceLineItem {
       max-width: 920px;
       padding: 24px;
       border-radius: 12px;
-      background: var(--bg-card, #131722);
-      border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+      background: #111526 !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
     }
     form {
       display: flex;
@@ -905,6 +938,41 @@ export interface InvoiceLineItem {
       font-size: 12px;
     }
 
+    .dropdown-count-header {
+      padding: 8px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #93c5fd;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #131726;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+
+      .count-badge {
+        background: #0284c7;
+        color: #ffffff;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 800;
+      }
+    }
+
+    .match-hint {
+      color: #38bdf8 !important;
+      font-weight: 500;
+      strong {
+        color: #ffffff;
+      }
+    }
+
     /* Items Footer matching screenshot */
     .items-footer {
       display: flex;
@@ -1117,6 +1185,8 @@ export default class InvoiceForm implements OnInit {
   selectedCustomer = signal<any | null>(null);
   customerSearchCtrl = new FormControl<any>('');
   filteredCustomers = signal<any[]>([]);
+  customerSearchQuery = signal<string>('');
+  productSearchQuery = signal<string>('');
   isSubmitting = signal<boolean>(false);
   isGstInvoice = signal<boolean>(false);
 
@@ -1253,18 +1323,46 @@ export default class InvoiceForm implements OnInit {
 
   filterCustomers(query: any) {
     const q = (typeof query === 'string' ? query : (query?.name || '')).trim().toLowerCase();
+    this.customerSearchQuery.set(q);
     if (!q) {
       this.filteredCustomers.set(this.customers());
       return;
     }
-    const matches = this.customers().filter((c) => {
-      const nameMatch = (c.name || '').toLowerCase().includes(q);
-      const phoneMatch = (c.phone || '').toLowerCase().includes(q);
-      const gstinMatch = (c.gstin || '').toLowerCase().includes(q);
-      const stateMatch = (c.state || '').toLowerCase().includes(q);
-      return nameMatch || phoneMatch || gstinMatch || stateMatch;
-    });
-    this.filteredCustomers.set(matches);
+
+    const isDigits = /^\d+$/.test(q);
+    const startsWithList: any[] = [];
+    const wordStartsWithList: any[] = [];
+    const containsList: any[] = [];
+
+    for (const c of this.customers()) {
+      const name = (c.name || '').trim();
+      const nameLower = name.toLowerCase();
+      const phone = (c.phone || '').trim();
+
+      if (isDigits) {
+        if (phone.includes(q) || nameLower.includes(q)) {
+          containsList.push(c);
+        }
+        continue;
+      }
+
+      // 1. Prefix match on full name: e.g. "Harshit..." starts with "h"
+      if (nameLower.startsWith(q)) {
+        startsWithList.push(c);
+      }
+      // 2. Prefix match on any word: e.g. "Sunrise Hardware" word "Hardware" starts with "h"
+      else if (nameLower.split(/\s+/).some((w: string) => w.startsWith(q))) {
+        wordStartsWithList.push(c);
+      }
+      // 3. Substring match in customer name only
+      else if (nameLower.includes(q)) {
+        containsList.push(c);
+      }
+      // NOTE: We do NOT match state or address when searching by letters!
+      // This ensures "Jaipur RO Care" and "Mumbai Water Filters" do not show up for 'h'!
+    }
+
+    this.filteredCustomers.set([...startsWithList, ...wordStartsWithList, ...containsList]);
   }
 
   onCustomerInputFocus(trigger: any, event: any) {
@@ -1309,16 +1407,44 @@ export default class InvoiceForm implements OnInit {
 
   filterProducts(query: any) {
     const q = (typeof query === 'string' ? query : (query?.name || '')).trim().toLowerCase();
+    this.productSearchQuery.set(q);
     if (!q) {
       this.filteredProducts.set(this.allProducts().slice(0, 30));
       return;
     }
-    const matches = this.allProducts().filter((p) => {
-      const nameMatch = p.name.toLowerCase().includes(q);
-      const hsnMatch = p.hsn ? p.hsn.toLowerCase().includes(q) : false;
-      return nameMatch || hsnMatch;
-    });
-    this.filteredProducts.set(matches.slice(0, 30));
+
+    const isDigits = /^\d+$/.test(q);
+    const startsWithList: Product[] = [];
+    const wordStartsWithList: Product[] = [];
+    const containsList: Product[] = [];
+
+    for (const p of this.allProducts()) {
+      const name = (p.name || '').trim();
+      const nameLower = name.toLowerCase();
+      const hsn = (p.hsn || '').trim();
+
+      if (isDigits) {
+        if (hsn.includes(q) || nameLower.includes(q)) {
+          containsList.push(p);
+        }
+        continue;
+      }
+
+      // 1. Prefix match on full product name: e.g. "HIGH PRESSURE SWITCH..." starts with "h"
+      if (nameLower.startsWith(q)) {
+        startsWithList.push(p);
+      }
+      // 2. Prefix match on any word in product name: e.g. "RO MEMBRANE HOUSING..." word "HOUSING" starts with "h"
+      else if (nameLower.split(/\s+/).some((w: string) => w.startsWith(q))) {
+        wordStartsWithList.push(p);
+      }
+      // 3. Substring match in product name
+      else if (nameLower.includes(q)) {
+        containsList.push(p);
+      }
+    }
+
+    this.filteredProducts.set([...startsWithList, ...wordStartsWithList, ...containsList].slice(0, 30));
   }
 
   onProductInputFocus(index: number, trigger: any, event: any) {

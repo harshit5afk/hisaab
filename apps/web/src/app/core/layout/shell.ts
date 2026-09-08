@@ -30,7 +30,6 @@ interface NavItem {
   ],
   template: `
     <div class="shell">
-      <!-- Sidebar -->
       <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
         <div class="sidebar-header">
           <div class="logo" (click)="toggleSidebar()">
@@ -68,13 +67,23 @@ interface NavItem {
         </div>
       </aside>
 
-      <!-- Main Content -->
       <main class="main-content">
         <header class="top-bar">
           <button mat-icon-button (click)="toggleSidebar()">
             <mat-icon>menu</mat-icon>
           </button>
+
           <div class="spacer"></div>
+
+          <label class="theme-picker" aria-label="Select theme">
+            <mat-icon>palette</mat-icon>
+            <select [value]="selectedTheme()" (change)="changeTheme($any($event.target).value)">
+              @for (theme of themeOptions; track theme.value) {
+                <option [value]="theme.value">{{ theme.label }}</option>
+              }
+            </select>
+          </label>
+
           <div class="user-info">
             <mat-icon>account_circle</mat-icon>
             <span class="user-name">{{ authService.user()?.name }}</span>
@@ -92,25 +101,27 @@ interface NavItem {
       display: flex;
       height: 100vh;
       overflow: hidden;
+      background: var(--page-bg);
     }
 
     .sidebar {
       width: 260px;
-      background: var(--bg-secondary);
-      border-right: 1px solid var(--border-color);
+      background: linear-gradient(180deg, var(--sidebar-start), var(--sidebar-end));
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       flex-direction: column;
       transition: width var(--transition-normal);
       z-index: 100;
+      box-shadow: 20px 0 40px rgba(19, 31, 73, 0.12);
 
       &.collapsed {
-        width: 68px;
+        width: 72px;
       }
     }
 
     .sidebar-header {
       padding: 20px 16px;
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .logo {
@@ -125,31 +136,30 @@ interface NavItem {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 36px;
-      height: 36px;
-      background: var(--gradient-primary);
-      border-radius: 10px;
-      font-size: 1.25rem;
-      font-weight: 700;
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #60a5fa 0%, #8b5cf6 100%);
+      border-radius: 12px;
+      font-size: 1.3rem;
+      font-weight: 800;
       color: white;
       flex-shrink: 0;
+      box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35);
     }
 
     .logo-text {
       font-size: 1.35rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
-      background: linear-gradient(135deg, #8ab4f8, #c084fc);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.03em;
+      color: #eef4ff;
     }
 
     .sidebar-nav {
       flex: 1;
-      padding: 12px 8px;
+      padding: 14px 10px;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
       overflow-y: auto;
     }
 
@@ -157,9 +167,9 @@ interface NavItem {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      color: var(--text-secondary);
+      padding: 11px 12px;
+      border-radius: 12px;
+      color: var(--sidebar-text);
       text-decoration: none;
       cursor: pointer;
       transition: all var(--transition-fast);
@@ -173,28 +183,29 @@ interface NavItem {
       }
 
       &:hover {
-        background: rgba(255, 255, 255, 0.06);
-        color: var(--text-primary);
+        background: var(--sidebar-hover);
+        color: #ffffff;
       }
 
       &.active {
-        background: rgba(138, 180, 248, 0.12);
-        color: var(--accent-indigo);
+        background: var(--sidebar-active);
+        color: #f8fbff;
+        box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.22);
 
         mat-icon {
-          color: var(--accent-indigo);
+          color: #8ad6ff;
         }
       }
     }
 
     .nav-label {
       font-size: 0.9rem;
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .sidebar-footer {
-      padding: 8px;
-      border-top: 1px solid var(--border-color);
+      padding: 8px 10px 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     .main-content {
@@ -202,31 +213,68 @@ interface NavItem {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      background: transparent;
     }
 
     .top-bar {
       display: flex;
       align-items: center;
-      padding: 8px 24px;
-      height: 56px;
+      padding: 12px 24px;
+      height: 72px;
       border-bottom: 1px solid var(--border-color);
-      background: var(--bg-secondary);
+      background: var(--topbar-bg);
+      backdrop-filter: blur(10px);
       flex-shrink: 0;
+      gap: 12px;
     }
 
     .spacer {
       flex: 1;
     }
 
+    .theme-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.25);
+      color: var(--text-primary);
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      select {
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        font-weight: 600;
+        outline: none;
+        padding-right: 4px;
+        cursor: pointer;
+      }
+    }
+
     .user-info {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(79, 110, 247, 0.06);
       color: var(--text-secondary);
+      border: 1px solid var(--border-color);
 
       .user-name {
         font-size: 0.9rem;
-        font-weight: 500;
+        font-weight: 600;
+        color: var(--text-primary);
       }
     }
 
@@ -234,6 +282,7 @@ interface NavItem {
       flex: 1;
       overflow-y: auto;
       padding: 32px;
+      background: transparent;
     }
 
     @media (max-width: 768px) {
@@ -254,11 +303,24 @@ interface NavItem {
       .content-area {
         padding: 16px;
       }
+
+      .theme-picker {
+        max-width: 120px;
+      }
     }
   `],
 })
 export class Shell {
   sidebarCollapsed = signal(false);
+  selectedTheme = signal<'light' | 'dark' | 'ocean' | 'forest' | 'sunset'>('dark');
+
+  themeOptions = [
+    { value: 'dark', label: 'Dark' },
+    { value: 'light', label: 'Light' },
+    { value: 'ocean', label: 'Ocean' },
+    { value: 'forest', label: 'Forest' },
+    { value: 'sunset', label: 'Sunset' },
+  ];
 
   navItems: NavItem[] = [
     { icon: 'dashboard', label: 'Dashboard', route: '/dashboard' },
@@ -272,7 +334,18 @@ export class Shell {
     { icon: 'smart_toy', label: 'AI Query', route: '/ai/query' },
   ];
 
-  constructor(public authService: AuthService) {}
+  constructor(public authService: AuthService) {
+    this.applyTheme(this.selectedTheme());
+  }
+
+  changeTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
+    this.selectedTheme.set(theme);
+    this.applyTheme(theme);
+  }
+
+  private applyTheme(theme: 'light' | 'dark' | 'ocean' | 'forest' | 'sunset') {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
 
   toggleSidebar() {
     this.sidebarCollapsed.update((v) => !v);
