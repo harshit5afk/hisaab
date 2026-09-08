@@ -172,6 +172,49 @@ async function main() {
 
   const totalPurchases = await prisma.purchase.aggregate({ _sum: { amount: true } });
   console.log(`\n  📦 Total purchases: ₹${(Number(totalPurchases._sum.amount || 0) / 100).toLocaleString('en-IN')}`);
+
+  // ─── Products Catalog ────────────────────────────────────────────────
+  console.log('🏷️ Seeding products catalog...');
+  const catalog = [
+    { name: 'INLINE CRUZE SEDIMENT 10 INCH', hsn: '84219900', rate: paise(450), unit: 'NOS' },
+    { name: 'INLINE CRUZE PRE CARBON 10 INCH', hsn: '84219900', rate: paise(420), unit: 'NOS' },
+    { name: 'INLINE CRUZE POST CARBON 10 INCH', hsn: '84219900', rate: paise(380), unit: 'NOS' },
+    { name: 'MEMBRANE 75 GPD VONTRON ORIGINAL', hsn: '84212190', rate: paise(1450), unit: 'NOS' },
+    { name: 'MEMBRANE 80 GPD CSM RESIDENTIAL', hsn: '84212190', rate: paise(1650), unit: 'NOS' },
+    { name: 'MEMBRANE 100 GPD DOW FILMTEC', hsn: '84212190', rate: paise(2200), unit: 'NOS' },
+    { name: 'RO BOOSTER PUMP 100 GPD KEMFLO', hsn: '84137090', rate: paise(1850), unit: 'NOS' },
+    { name: 'RO BOOSTER PUMP 75 GPD CCK TAIWAN', hsn: '84137090', rate: paise(1550), unit: 'NOS' },
+    { name: 'RO BOOSTER PUMP 150 GPD GRAND FOREST', hsn: '84137090', rate: paise(2400), unit: 'NOS' },
+    { name: 'SMPS POWER ADAPTOR 24V 2.5A', hsn: '85044090', rate: paise(650), unit: 'NOS' },
+    { name: 'SMPS POWER ADAPTOR 36V 2A COPPER', hsn: '85044090', rate: paise(750), unit: 'NOS' },
+    { name: 'SOLENOID VALVE 24V DC SLX BLUE', hsn: '84818030', rate: paise(320), unit: 'NOS' },
+    { name: 'FLOAT VALVE MICRO SWITCH HEAVY', hsn: '84818090', rate: paise(180), unit: 'NOS' },
+    { name: 'FLOW RESTRICTOR FR 450 QUICK CONNECT', hsn: '84219900', rate: paise(85), unit: 'NOS' },
+    { name: 'FLOW RESTRICTOR FR 650 PUSH FIT', hsn: '84219900', rate: paise(95), unit: 'NOS' },
+    { name: 'SPUN POLYPROPYLENE FILTER 10 INCH 5 MICRON', hsn: '84219900', rate: paise(120), unit: 'NOS' },
+    { name: 'CTO CARBON BLOCK FILTER CARTRIDGE 10 INCH', hsn: '84219900', rate: paise(280), unit: 'NOS' },
+    { name: 'ALKALINE BIO-MINERAL PH BOOSTER CARTRIDGE', hsn: '84219900', rate: paise(550), unit: 'NOS' },
+    { name: 'UF ULTRA FILTRATION HOLLOW FIBER MEMBRANE', hsn: '84212190', rate: paise(480), unit: 'NOS' },
+    { name: 'TDS CONTROLLER / ADJUSTER BRASS VALVE', hsn: '84818090', rate: paise(160), unit: 'NOS' },
+    { name: 'PRE-FILTER HOUSING 10 INCH BOWL WHITE', hsn: '84219900', rate: paise(350), unit: 'NOS' },
+    { name: 'RO MEMBRANE HOUSING FOOD GRADE HEAVY', hsn: '84219900', rate: paise(290), unit: 'NOS' },
+    { name: 'AUTO FLUSHING CONTROLLER TIMER 18 SEC', hsn: '85371000', rate: paise(850), unit: 'NOS' },
+    { name: 'WATER STORAGE TANK 12 LITRE HYDROPNEUMATIC', hsn: '39269099', rate: paise(1250), unit: 'NOS' },
+    { name: 'PRESSURE REDUCING VALVE (PRV) 1/4 INCH', hsn: '84818090', rate: paise(340), unit: 'NOS' },
+    { name: 'LOW PRESSURE SWITCH (LPS) QUICK FIT', hsn: '85365090', rate: paise(190), unit: 'NOS' },
+    { name: 'HIGH PRESSURE SWITCH (HPS) QUICK FIT', hsn: '85365090', rate: paise(210), unit: 'NOS' },
+    { name: 'SYS MARS BLACK RO CABINET SYSTEM', hsn: '84212190', rate: paise(4000), unit: 'NOS' },
+    { name: 'COPPER + ZINC MINERAL ENRICHER CARTRIDGE', hsn: '84219900', rate: paise(650), unit: 'NOS' },
+    { name: 'UV STAINLESS STEEL CHAMBER WITH PHILIPS TUBE', hsn: '84212190', rate: paise(1350), unit: 'NOS' },
+  ];
+  for (const item of catalog) {
+    const existing = await prisma.product.findFirst({ where: { name: item.name } });
+    if (!existing) {
+      await prisma.product.create({ data: item });
+    }
+  }
+  console.log(`  ✅ Seeded ${catalog.length} products`);
+
   console.log('─'.repeat(60));
   console.log('\n✨ Seeding complete!');
 }

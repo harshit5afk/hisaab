@@ -1,6 +1,6 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, FormsModule } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, FormControl, Validators, FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -83,16 +83,75 @@ export interface InvoiceLineItem {
 
           @if (customerMode() === 'existing') {
             <div class="existing-customer-picker">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Select Customer</mat-label>
-                <mat-select formControlName="customerId" (selectionChange)="onCustomerSelected($event.value)">
-                  @for (c of customers(); track c.id) {
-                    <mat-option [value]="c.id">
-                      {{ c.name }} {{ c.phone ? '(' + c.phone + ')' : '' }} {{ c.state ? '[' + c.state + ']' : '' }}
+              <mat-form-field appearance="outline" class="full-width customer-search-field">
+                <mat-label>Select Customer *</mat-label>
+                <input
+                  matInput
+                  #customerAutoTrigger="matAutocompleteTrigger"
+                  [formControl]="customerSearchCtrl"
+                  [matAutocomplete]="customerAuto"
+                  (focus)="onCustomerInputFocus(customerAutoTrigger, $event)"
+                  (click)="onCustomerInputClick(customerAutoTrigger)"
+                  (input)="filterCustomers($any($event.target).value)"
+                  placeholder="Type any letter to search customer or select from list..."
+                  autocomplete="off"
+                />
+                @if (selectedCustomer()) {
+                  <button
+                    mat-icon-button
+                    matSuffix
+                    type="button"
+                    (click)="clearCustomerSelection($event)"
+                    matTooltip="Clear customer"
+                    class="clear-cust-btn"
+                  >
+                    <mat-icon>close</mat-icon>
+                  </button>
+                }
+                <button
+                  mat-icon-button
+                  matSuffix
+                  type="button"
+                  (click)="toggleCustomerDropdown(customerAutoTrigger, $event)"
+                  class="dropdown-toggle-btn"
+                  matTooltip="Show all customers"
+                >
+                  <mat-icon>arrow_drop_down</mat-icon>
+                </button>
+
+                <mat-autocomplete
+                  #customerAuto="matAutocomplete"
+                  [displayWith]="displayCustomerFn"
+                  (optionSelected)="onCustomerAutocompleteSelected($event.option.value)"
+                  class="custom-dark-autocomplete"
+                >
+                  @for (c of filteredCustomers(); track c.id) {
+                    <mat-option [value]="c" class="customer-mat-option">
+                      <div class="customer-dropdown-option">
+                        <div class="cust-primary">
+                          <span class="cust-title">{{ c.name }}</span>
+                          @if (c.phone) {
+                            <span class="cust-phone-badge">({{ c.phone }})</span>
+                          }
+                        </div>
+                        <div class="cust-secondary">
+                          @if (c.state) {
+                            <span class="cust-state-tag">{{ c.state }}</span>
+                          }
+                          @if (c.gstin) {
+                            <span class="cust-gstin-tag">GST: {{ c.gstin }}</span>
+                          }
+                        </div>
+                      </div>
                     </mat-option>
                   }
-                </mat-select>
-                <mat-hint>Choose from your saved customer list</mat-hint>
+                  @if (filteredCustomers().length === 0) {
+                    <mat-option disabled class="no-result-option">
+                      <span class="no-match-text">No customer found. Click '+ New Customer' to add.</span>
+                    </mat-option>
+                  }
+                </mat-autocomplete>
+                <mat-hint>Choose from your saved customer list or type any letter to filter</mat-hint>
               </mat-form-field>
 
               @if (selectedCustomer()) {
@@ -204,26 +263,55 @@ export interface InvoiceLineItem {
                 <div class="item-index">{{ $index + 1 }}</div>
 
                 <div class="item-fields">
-                  <!-- Product Name with Catalog Autocomplete -->
+                  <!-- Product Name with Catalog Autocomplete & Dropdown Arrow -->
                   <mat-form-field appearance="outline" class="product-name-field">
                     <mat-label>Product / Service Name **</mat-label>
                     <input
                       matInput
+                      #productAutoTrigger="matAutocompleteTrigger"
                       [(ngModel)]="item.name"
                       [ngModelOptions]="{ standalone: true }"
-                      [matAutocomplete]="auto"
-                      (input)="filterProducts(item.name)"
+                      [matAutocomplete]="productAuto"
+                      (focus)="onProductInputFocus($index, productAutoTrigger, $event)"
+                      (click)="onProductInputClick($index, productAutoTrigger)"
+                      (input)="filterProducts($any($event.target).value)"
                       (ngModelChange)="onItemUpdated($index)"
                       placeholder="e.g. INLINE CRUZE SEDIMENT, PRE CARBON"
+                      autocomplete="off"
                       required
                     />
-                    <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onProductSelected($index, $event.option.value)">
+                    <button
+                      mat-icon-button
+                      matSuffix
+                      type="button"
+                      (click)="toggleProductDropdown(productAutoTrigger, $event)"
+                      class="dropdown-toggle-btn"
+                      matTooltip="Browse product catalog"
+                    >
+                      <mat-icon>arrow_drop_down</mat-icon>
+                    </button>
+                    <mat-autocomplete
+                      #productAuto="matAutocomplete"
+                      [displayWith]="displayProductFn"
+                      (optionSelected)="onProductSelected($index, $event.option.value)"
+                      class="custom-dark-autocomplete"
+                    >
                       @for (p of filteredProducts(); track p.id) {
-                        <mat-option [value]="p">
+                        <mat-option [value]="p" class="product-mat-option">
                           <div class="product-option-row">
-                            <span class="p-name">{{ p.name }}</span>
+                            <div class="p-info">
+                              <span class="p-name">{{ p.name }}</span>
+                              @if (p.hsn) {
+                                <span class="p-hsn-badge">HSN: {{ p.hsn }}</span>
+                              }
+                            </div>
                             <span class="p-rate">₹ {{ (p.rate / 100).toFixed(2) }}</span>
                           </div>
+                        </mat-option>
+                      }
+                      @if (filteredProducts().length === 0) {
+                        <mat-option disabled class="no-result-option">
+                          <span class="no-result-text">No product found in catalog. You can type custom name.</span>
                         </mat-option>
                       }
                     </mat-autocomplete>
@@ -715,19 +803,106 @@ export interface InvoiceLineItem {
       flex-shrink: 0;
     }
 
+    .dropdown-toggle-btn {
+      color: #94a3b8;
+      transition: all 0.15s ease;
+      &:hover {
+        color: #38bdf8;
+      }
+    }
+    .clear-cust-btn {
+      color: #ef4444;
+      &:hover {
+        color: #f87171;
+      }
+    }
+
+    .customer-dropdown-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 4px 0;
+      gap: 12px;
+
+      .cust-primary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .cust-title {
+          font-weight: 600;
+          color: #f8fafc;
+          font-size: 13px;
+        }
+        .cust-phone-badge {
+          font-size: 11px;
+          color: #38bdf8;
+          font-weight: 500;
+        }
+      }
+
+      .cust-secondary {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+
+        .cust-state-tag {
+          font-size: 10px;
+          background: rgba(14, 165, 233, 0.15);
+          color: #38bdf8;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+        }
+        .cust-gstin-tag {
+          font-size: 10px;
+          background: rgba(255, 255, 255, 0.08);
+          padding: 2px 6px;
+          border-radius: 4px;
+          color: #cbd5e1;
+          font-family: monospace;
+        }
+      }
+    }
+
     .product-option-row {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       width: 100%;
       gap: 16px;
 
-      .p-name {
-        font-weight: 500;
+      .p-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .p-name {
+          font-weight: 500;
+          color: #f8fafc;
+        }
+        .p-hsn-badge {
+          font-size: 10px;
+          background: rgba(255, 255, 255, 0.08);
+          padding: 2px 6px;
+          border-radius: 4px;
+          color: #94a3b8;
+        }
       }
       .p-rate {
         color: #38bdf8;
-        font-weight: 600;
+        font-weight: 700;
+        font-size: 14px;
+        white-space: nowrap;
       }
+    }
+
+    .no-result-option {
+      font-style: italic;
+      color: #94a3b8 !important;
+      font-size: 12px;
     }
 
     /* Items Footer matching screenshot */
@@ -940,8 +1115,23 @@ export default class InvoiceForm implements OnInit {
   filteredProducts = signal<Product[]>([]);
   customerMode = signal<'existing' | 'new'>('existing');
   selectedCustomer = signal<any | null>(null);
+  customerSearchCtrl = new FormControl<any>('');
+  filteredCustomers = signal<any[]>([]);
   isSubmitting = signal<boolean>(false);
   isGstInvoice = signal<boolean>(false);
+
+  // Display functions for Material autocomplete
+  displayCustomerFn = (c: any): string => {
+    if (!c) return '';
+    if (typeof c === 'string') return c;
+    return c.name ? `${c.name}${c.phone ? ' (' + c.phone + ')' : ''}` : '';
+  };
+
+  displayProductFn = (p: any): string => {
+    if (!p) return '';
+    if (typeof p === 'string') return p;
+    return p.name || '';
+  };
 
   // Dynamic Product Line Items
   lineItems = signal<InvoiceLineItem[]>([
@@ -1035,10 +1225,16 @@ export default class InvoiceForm implements OnInit {
       next: (res) => {
         const list = res?.data || [];
         this.customers.set(list);
+        this.filteredCustomers.set(list);
         if (list.length === 0) {
           this.setCustomerMode('new');
         } else {
           this.setCustomerMode('existing');
+          // Match Global Packaging Co. if available or pick first customer
+          const found = list.find((c: any) => c.name?.toLowerCase().includes('global packaging')) || list[0];
+          if (found && !this.selectedCustomer()) {
+            this.selectCustomer(found);
+          }
         }
       },
       error: () => this.setCustomerMode('new'),
@@ -1050,33 +1246,134 @@ export default class InvoiceForm implements OnInit {
       next: (res) => {
         const list = res?.data || [];
         this.allProducts.set(list);
-        this.filteredProducts.set(list.slice(0, 10));
+        this.filteredProducts.set(list.slice(0, 30));
       },
     });
   }
 
-  filterProducts(query: string) {
-    if (!query || !query.trim()) {
-      this.filteredProducts.set(this.allProducts().slice(0, 10));
+  filterCustomers(query: any) {
+    const q = (typeof query === 'string' ? query : (query?.name || '')).trim().toLowerCase();
+    if (!q) {
+      this.filteredCustomers.set(this.customers());
       return;
     }
-    const q = query.toLowerCase();
-    const matches = this.allProducts().filter(
-      (p) => p.name.toLowerCase().includes(q) || (p.hsn && p.hsn.includes(q)),
-    );
-    this.filteredProducts.set(matches.slice(0, 15));
+    const matches = this.customers().filter((c) => {
+      const nameMatch = (c.name || '').toLowerCase().includes(q);
+      const phoneMatch = (c.phone || '').toLowerCase().includes(q);
+      const gstinMatch = (c.gstin || '').toLowerCase().includes(q);
+      const stateMatch = (c.state || '').toLowerCase().includes(q);
+      return nameMatch || phoneMatch || gstinMatch || stateMatch;
+    });
+    this.filteredCustomers.set(matches);
   }
 
-  onProductSelected(index: number, product: Product) {
+  onCustomerInputFocus(trigger: any, event: any) {
+    event?.target?.select?.();
+    this.filterCustomers('');
+    trigger.openPanel();
+  }
+
+  onCustomerInputClick(trigger: any) {
+    this.filterCustomers('');
+    trigger.openPanel();
+  }
+
+  toggleCustomerDropdown(trigger: any, event: MouseEvent) {
+    event.stopPropagation();
+    if (trigger.panelOpen) {
+      trigger.closePanel();
+    } else {
+      this.filterCustomers('');
+      trigger.openPanel();
+    }
+  }
+
+  onCustomerAutocompleteSelected(customer: any) {
+    if (!customer) return;
+    this.selectCustomer(customer);
+  }
+
+  selectCustomer(customer: any) {
+    this.selectedCustomer.set(customer);
+    this.form.patchValue({ customerId: customer.id });
+    this.customerSearchCtrl.setValue(customer);
+  }
+
+  clearCustomerSelection(event?: MouseEvent) {
+    if (event) event.stopPropagation();
+    this.selectedCustomer.set(null);
+    this.form.patchValue({ customerId: '' });
+    this.customerSearchCtrl.setValue('');
+    this.filterCustomers('');
+  }
+
+  filterProducts(query: any) {
+    const q = (typeof query === 'string' ? query : (query?.name || '')).trim().toLowerCase();
+    if (!q) {
+      this.filteredProducts.set(this.allProducts().slice(0, 30));
+      return;
+    }
+    const matches = this.allProducts().filter((p) => {
+      const nameMatch = p.name.toLowerCase().includes(q);
+      const hsnMatch = p.hsn ? p.hsn.toLowerCase().includes(q) : false;
+      return nameMatch || hsnMatch;
+    });
+    this.filteredProducts.set(matches.slice(0, 30));
+  }
+
+  onProductInputFocus(index: number, trigger: any, event: any) {
+    event?.target?.select?.();
+    this.filterProducts(this.lineItems()[index]?.name || '');
+    trigger.openPanel();
+  }
+
+  onProductInputClick(index: number, trigger: any) {
+    this.filterProducts(this.lineItems()[index]?.name || '');
+    trigger.openPanel();
+  }
+
+  toggleProductDropdown(trigger: any, event: MouseEvent) {
+    event.stopPropagation();
+    if (trigger.panelOpen) {
+      trigger.closePanel();
+    } else {
+      this.filterProducts('');
+      trigger.openPanel();
+    }
+  }
+
+  onProductSelected(index: number, product: any) {
+    if (!product) return;
     const items = [...this.lineItems()];
-    items[index] = {
-      ...items[index],
-      productId: product.id,
-      name: product.name,
-      hsn: product.hsn || '',
-      rate: product.rate / 100, // convert paise to rupees
-      total: Math.round(items[index].qty * (product.rate / 100) * 100) / 100,
-    };
+    if (typeof product === 'object' && product.name) {
+      items[index] = {
+        ...items[index],
+        productId: product.id,
+        name: product.name,
+        hsn: product.hsn || '',
+        rate: product.rate / 100, // convert paise to rupees
+        total: Math.round(items[index].qty * (product.rate / 100) * 100) / 100,
+      };
+    } else if (typeof product === 'string') {
+      const matched = this.allProducts().find(
+        (p) => p.name.toLowerCase() === product.toLowerCase(),
+      );
+      if (matched) {
+        items[index] = {
+          ...items[index],
+          productId: matched.id,
+          name: matched.name,
+          hsn: matched.hsn || '',
+          rate: matched.rate / 100,
+          total: Math.round(items[index].qty * (matched.rate / 100) * 100) / 100,
+        };
+      } else {
+        items[index] = {
+          ...items[index],
+          name: product,
+        };
+      }
+    }
     this.lineItems.set(items);
   }
 
@@ -1086,11 +1383,15 @@ export default class InvoiceForm implements OnInit {
       this.form.get('customerId')?.setValidators([Validators.required]);
       this.form.get('customerName')?.clearValidators();
       this.form.get('customerName')?.setValue('');
+      if (this.selectedCustomer()) {
+        this.customerSearchCtrl.setValue(this.selectedCustomer());
+      }
     } else {
       this.form.get('customerId')?.clearValidators();
       this.form.get('customerId')?.setValue('');
       this.form.get('customerName')?.setValidators([Validators.required]);
       this.selectedCustomer.set(null);
+      this.customerSearchCtrl.setValue('');
     }
     this.form.get('customerId')?.updateValueAndValidity();
     this.form.get('customerName')?.updateValueAndValidity();
@@ -1098,7 +1399,11 @@ export default class InvoiceForm implements OnInit {
 
   onCustomerSelected(customerId: string) {
     const found = this.customers().find((c) => c.id === customerId);
-    this.selectedCustomer.set(found || null);
+    if (found) {
+      this.selectCustomer(found);
+    } else {
+      this.selectedCustomer.set(null);
+    }
   }
 
   setGst(isGst: boolean) {
