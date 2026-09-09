@@ -17,9 +17,12 @@ async function bootstrap() {
     }),
   );
 
-  // CORS: allow Angular dev server
+  // CORS: allow Angular dev server and production origins
   app.enableCors({
-    origin: ['http://localhost:4200'],
+    origin: [
+      'http://localhost:4200',
+      'https://hisaab-lm0z.onrender.com',
+    ],
     credentials: true,
   });
 
