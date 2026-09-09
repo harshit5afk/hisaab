@@ -22,6 +22,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:4200',
       'https://hisaab-lm0z.onrender.com',
+      'https://ionshift.netlify.app',
     ],
     credentials: true,
   });
