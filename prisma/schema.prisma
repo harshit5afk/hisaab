@@ -81,6 +81,7 @@ model Purchase {
   vendor      String
   date        DateTime
   amount      Int       // stored in paise
+  quantity    Float?    @default(1)
   description String?
   createdBy   String
   createdAt   DateTime  @default(now())

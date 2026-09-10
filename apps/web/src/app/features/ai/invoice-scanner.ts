@@ -132,9 +132,10 @@ export default class InvoiceScanner {
   savePurchase() {
     const r = this.result();
     if (r) {
+      const totalQty = r.items?.reduce((sum: number, it: any) => sum + (Number(it.qty) || 0), 0) || 1;
       // Navigate to purchase form with pre-filled data via query params
       this.router.navigate(['/purchases/new'], {
-        queryParams: { vendor: r.vendor, billNo: r.billNo, date: r.date, amount: r.amount },
+        queryParams: { vendor: r.vendor, billNo: r.billNo, date: r.date, amount: r.amount, quantity: totalQty },
       });
     }
   }

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsInt, IsOptional, IsDateString, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, IsOptional, IsDateString, IsNumber, Min } from 'class-validator';
 
 export class CreatePurchaseDto {
   @IsOptional()
@@ -15,6 +15,11 @@ export class CreatePurchaseDto {
   @IsInt()
   @Min(1)
   amount: number; // in paise
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  quantity?: number;
 
   @IsOptional()
   @IsString()

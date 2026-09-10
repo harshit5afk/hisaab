@@ -71,6 +71,7 @@ export class PurchasesService {
         ...(dto.vendor && { vendor: dto.vendor }),
         ...(dto.date && { date: new Date(dto.date) }),
         ...(dto.amount && { amount: dto.amount }),
+        ...(dto.quantity !== undefined && { quantity: dto.quantity }),
         ...(dto.description !== undefined && { description: dto.description }),
       },
     });

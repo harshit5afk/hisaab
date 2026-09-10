@@ -23,6 +23,7 @@ import { PurchasesApiService } from '../../core/api/purchases-api.service';
         <ng-container matColumnDef="billNo"><th mat-header-cell *matHeaderCellDef>Bill #</th><td mat-cell *matCellDef="let p">{{ p.billNo || '—' }}</td></ng-container>
         <ng-container matColumnDef="vendor"><th mat-header-cell *matHeaderCellDef>Vendor</th><td mat-cell *matCellDef="let p">{{ p.vendor }}</td></ng-container>
         <ng-container matColumnDef="date"><th mat-header-cell *matHeaderCellDef>Date</th><td mat-cell *matCellDef="let p">{{ p.date | date:'dd MMM yyyy' }}</td></ng-container>
+        <ng-container matColumnDef="quantity"><th mat-header-cell *matHeaderCellDef>Qty</th><td mat-cell *matCellDef="let p">{{ p.quantity ?? 1 }}</td></ng-container>
         <ng-container matColumnDef="amount"><th mat-header-cell *matHeaderCellDef>Amount</th><td mat-cell *matCellDef="let p" class="amount-cell">{{ p.amount | paiseToRupees }}</td></ng-container>
         <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef></th><td mat-cell *matCellDef="let p"><button mat-icon-button color="warn" (click)="delete(p.id)"><mat-icon>delete</mat-icon></button></td></ng-container>
         <tr mat-header-row *matHeaderRowDef="columns"></tr>
@@ -34,7 +35,7 @@ import { PurchasesApiService } from '../../core/api/purchases-api.service';
 })
 export default class PurchaseList implements OnInit {
   purchases = signal<any[]>([]);
-  columns = ['billNo', 'vendor', 'date', 'amount', 'actions'];
+  columns = ['billNo', 'vendor', 'date', 'quantity', 'amount', 'actions'];
   constructor(private api: PurchasesApiService, private snackBar: MatSnackBar) {}
   ngOnInit() { this.load(); }
   load() { this.api.findAll().subscribe((r) => this.purchases.set(r.data)); }
