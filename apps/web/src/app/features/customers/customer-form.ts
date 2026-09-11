@@ -19,7 +19,7 @@ import { CustomersApiService } from '../../core/api/customers-api.service';
     <div class="card form-card">
       <form [formGroup]="form" (ngSubmit)="save()">
         <mat-form-field appearance="outline">
-          <mat-label>Customer Name *</mat-label>
+          <mat-label>Customer Name</mat-label>
           <input matInput formControlName="name" placeholder="e.g. Ramesh Traders / Sharma Ji" />
           <mat-icon matPrefix>person</mat-icon>
         </mat-form-field>
