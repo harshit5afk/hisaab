@@ -19,27 +19,28 @@ import { CustomersApiService } from '../../core/api/customers-api.service';
     <div class="card form-card">
       <form [formGroup]="form" (ngSubmit)="save()">
         <mat-form-field appearance="outline">
-          <mat-label>Name</mat-label>
-          <input matInput formControlName="name" />
+          <mat-label>Customer Name *</mat-label>
+          <input matInput formControlName="name" placeholder="e.g. Ramesh Traders / Sharma Ji" />
           <mat-icon matPrefix>person</mat-icon>
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Phone</mat-label>
-          <input matInput formControlName="phone" />
+          <mat-label>Phone Number (Optional)</mat-label>
+          <input matInput formControlName="phone" placeholder="e.g. 9829012345" />
           <mat-icon matPrefix>phone</mat-icon>
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>Address</mat-label>
-          <textarea matInput formControlName="address" rows="3"></textarea>
+          <mat-label>Address (Optional)</mat-label>
+          <textarea matInput formControlName="address" rows="3" placeholder="Shop/Office address"></textarea>
           <mat-icon matPrefix>location_on</mat-icon>
         </mat-form-field>
 
         <mat-form-field appearance="outline">
-          <mat-label>GSTIN</mat-label>
-          <input matInput formControlName="gstin" placeholder="e.g. 07AABCU9603R1ZM" />
+          <mat-label>GSTIN (Optional)</mat-label>
+          <input matInput formControlName="gstin" placeholder="e.g. 08AABCH1111H1Z1" maxlength="15" />
           <mat-icon matPrefix>verified</mat-icon>
+          <mat-hint>Leave empty if customer does not have GSTIN (B2C/Unregistered)</mat-hint>
         </mat-form-field>
 
         <div class="form-actions">
@@ -90,7 +91,13 @@ export default class CustomerForm implements OnInit {
   save() {
     if (this.form.invalid) return;
     this.saving.set(true);
-    const data = this.form.value;
+    const formVal = this.form.value;
+    const data = {
+      name: formVal.name?.trim(),
+      phone: formVal.phone?.trim() || null,
+      address: formVal.address?.trim() || null,
+      gstin: formVal.gstin?.trim() ? formVal.gstin.trim().toUpperCase() : null,
+    };
 
     const obs = this.isEdit()
       ? this.api.update(this.editId, data)
@@ -101,9 +108,16 @@ export default class CustomerForm implements OnInit {
         this.snackBar.open(this.isEdit() ? 'Customer updated' : 'Customer created', 'OK', { duration: 3000 });
         this.router.navigate(['/customers']);
       },
-      error: () => {
+      error: (err) => {
         this.saving.set(false);
-        this.snackBar.open('Failed to save customer', 'OK', { duration: 3000 });
+        const errObj = err?.error;
+        let msg = 'Failed to save customer';
+        if (typeof errObj?.message === 'string') {
+          msg = errObj.message;
+        } else if (Array.isArray(errObj?.message)) {
+          msg = errObj.message.join(', ');
+        }
+        this.snackBar.open(msg, 'OK', { duration: 4000 });
       },
     });
   }

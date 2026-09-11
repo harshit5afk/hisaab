@@ -42,14 +42,26 @@ export class CustomersService {
   }
 
   async create(dto: CreateCustomerDto, userId: string) {
-    return this.prisma.customer.create({
-      data: { ...dto, createdBy: userId },
-    });
+    const data: any = {
+      name: dto.name.trim(),
+      phone: dto.phone?.trim() || null,
+      address: dto.address?.trim() || null,
+      gstin: dto.gstin?.trim() ? dto.gstin.trim().toUpperCase() : null,
+      state: dto.state?.trim() || null,
+      createdBy: userId,
+    };
+    return this.prisma.customer.create({ data });
   }
 
   async update(id: string, dto: UpdateCustomerDto) {
     await this.findOne(id); // throws if not found
-    return this.prisma.customer.update({ where: { id }, data: dto });
+    const data: any = {};
+    if (dto.name !== undefined) data.name = dto.name.trim();
+    if (dto.phone !== undefined) data.phone = dto.phone?.trim() || null;
+    if (dto.address !== undefined) data.address = dto.address?.trim() || null;
+    if (dto.gstin !== undefined) data.gstin = dto.gstin?.trim() ? dto.gstin.trim().toUpperCase() : null;
+    if (dto.state !== undefined) data.state = dto.state?.trim() || null;
+    return this.prisma.customer.update({ where: { id }, data });
   }
 
   async remove(id: string) {
