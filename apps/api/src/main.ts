@@ -17,18 +17,18 @@ async function bootstrap() {
     }),
   );
 
-  // CORS: allow Angular dev server and production origins
-  app.enableCors({
-    origin: [
-      'http://localhost:4200',
-      'https://hisaab-lm0z.onrender.com',
-      'https://ionshift.netlify.app',
-    ],
-    credentials: true,
-  });
+  // CORS: only needed in dev mode (Angular dev server on :4200)
+  // In production, frontend is served from same NestJS server — no CORS needed
+  if (process.env.NODE_ENV !== 'production') {
+    app.enableCors({
+      origin: ['http://localhost:4200'],
+      credentials: true,
+    });
+  }
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Hisaab API running on http://localhost:${port}/api`);
+  console.log(`🚀 Hisaab running on http://localhost:${port}`);
 }
 bootstrap();
+

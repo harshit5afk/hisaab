@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_GUARD } from '@nestjs/core';
+import { join } from 'path';
 import { AppController } from './app.controller';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -21,6 +23,11 @@ import { ProductsModule } from './products/products.module';
       isGlobal: true,
       envFilePath: '../../.env', // root-level .env
     }),
+    // Serve Angular production build from NestJS (single URL setup)
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', '..', 'web', 'dist', 'web', 'browser'),
+      exclude: ['/api{/*path}'],
+    }),
     PrismaModule,
     AuthModule,
     CustomersModule,
@@ -40,3 +47,4 @@ import { ProductsModule } from './products/products.module';
   ],
 })
 export class AppModule {}
+

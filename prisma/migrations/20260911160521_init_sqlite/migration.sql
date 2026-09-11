@@ -1,41 +1,38 @@
 -- CreateTable
 CREATE TABLE "users" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
     "role" TEXT NOT NULL DEFAULT 'STAFF',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "customers" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "phone" TEXT,
     "address" TEXT,
     "gstin" TEXT,
     "state" TEXT,
     "createdBy" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "customers_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "deletedAt" DATETIME,
+    CONSTRAINT "customers_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "invoices" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "invoiceNo" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL,
+    "date" DATETIME NOT NULL,
     "amount" INTEGER NOT NULL,
     "isGstInvoice" BOOLEAN NOT NULL DEFAULT false,
-    "taxRate" DOUBLE PRECISION DEFAULT 18,
+    "taxRate" REAL DEFAULT 18,
     "cgst" INTEGER NOT NULL DEFAULT 0,
     "sgst" INTEGER NOT NULL DEFAULT 0,
     "igst" INTEGER NOT NULL DEFAULT 0,
@@ -44,66 +41,61 @@ CREATE TABLE "invoices" (
     "description" TEXT,
     "items" JSONB,
     "status" TEXT NOT NULL DEFAULT 'DRAFT',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "invoices_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "deletedAt" DATETIME,
+    CONSTRAINT "invoices_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "purchases" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "billNo" TEXT,
     "vendor" TEXT NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL,
+    "date" DATETIME NOT NULL,
     "amount" INTEGER NOT NULL,
+    "quantity" REAL DEFAULT 1,
     "description" TEXT,
     "createdBy" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "purchases_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "deletedAt" DATETIME,
+    CONSTRAINT "purchases_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "payments" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "customerId" TEXT NOT NULL,
     "invoiceId" TEXT,
-    "date" TIMESTAMP(3) NOT NULL,
+    "date" DATETIME NOT NULL,
     "amount" INTEGER NOT NULL,
     "mode" TEXT NOT NULL DEFAULT 'CASH',
     "bankAccountName" TEXT,
     "note" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "payments_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "deletedAt" DATETIME,
+    CONSTRAINT "payments_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customers" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "payments_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "invoices" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "products" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "hsn" TEXT,
     "unit" TEXT NOT NULL DEFAULT 'NOS',
     "rate" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "deletedAt" TIMESTAMP(3),
-
-    CONSTRAINT "products_pkey" PRIMARY KEY ("id")
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "deletedAt" DATETIME
 );
 
 -- CreateTable
 CREATE TABLE "sequences" (
-    "id" TEXT NOT NULL DEFAULT 'invoice_seq',
-    "current" INTEGER NOT NULL DEFAULT 0,
-
-    CONSTRAINT "sequences_pkey" PRIMARY KEY ("id")
+    "id" TEXT NOT NULL PRIMARY KEY DEFAULT 'invoice_seq',
+    "current" INTEGER NOT NULL DEFAULT 0
 );
 
 -- CreateIndex
@@ -165,18 +157,3 @@ CREATE INDEX "products_name_idx" ON "products"("name");
 
 -- CreateIndex
 CREATE INDEX "products_deletedAt_idx" ON "products"("deletedAt");
-
--- AddForeignKey
-ALTER TABLE "customers" ADD CONSTRAINT "customers_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "invoices" ADD CONSTRAINT "invoices_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "purchases" ADD CONSTRAINT "purchases_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "payments" ADD CONSTRAINT "payments_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "payments" ADD CONSTRAINT "payments_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "invoices"("id") ON DELETE SET NULL ON UPDATE CASCADE;

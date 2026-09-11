@@ -17,7 +17,10 @@
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate",
     "db:studio": "npx prisma studio",
-    "db:seed": "npx ts-node prisma/seed.ts"
+    "db:seed": "npx ts-node prisma/seed.ts",
+    "build:all": "npm run build:web && npm run build:api",
+    "start:prod": "cd apps/api && node dist/main.js",
+    "setup": "npx prisma generate && npx prisma migrate deploy && npm run build:all"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
