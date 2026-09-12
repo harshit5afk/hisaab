@@ -2,12 +2,23 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
+export interface ProductPurchase {
+  id: string;
+  billNo?: string;
+  vendor?: string;
+  date: string;
+  amount: number; // in paise
+  quantity?: number;
+}
+
 export interface Product {
   id: string;
   name: string;
   hsn?: string;
   unit: string;
   rate: number; // in paise
+  stock: number; // current inventory quantity
+  purchases?: ProductPurchase[];
   createdAt?: string;
   updatedAt?: string;
 }

@@ -78,7 +78,8 @@ model Invoice {
 model Purchase {
   id          String    @id @default(uuid())
   billNo      String?
-  vendor      String
+  vendor      String?
+  productId   String?
   date        DateTime
   amount      Int       // stored in paise
   quantity    Float?    @default(1)
@@ -88,9 +89,11 @@ model Purchase {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  creator User @relation("PurchaseCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  creator User     @relation("PurchaseCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  product Product? @relation("PurchaseProduct", fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([vendor])
+  @@index([productId])
   @@index([date])
   @@index([createdBy])
   @@index([deletedAt])
@@ -126,9 +129,12 @@ model Product {
   hsn       String?
   unit      String    @default("NOS") // NOS, PCS, KG, LTR, MTR etc.
   rate      Int       // default selling rate in paise
+  stock     Float     @default(0) // current inventory quantity
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  purchases Purchase[] @relation("PurchaseProduct")
 
   @@index([name])
   @@index([deletedAt])

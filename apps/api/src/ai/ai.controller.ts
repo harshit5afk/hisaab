@@ -18,9 +18,10 @@ export class AiController {
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith('image/')) {
+        const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!supportedTypes.includes(file.mimetype)) {
           return cb(
-            new BadRequestException('Only image files are allowed'),
+            new BadRequestException('Only JPEG, PNG, WEBP, and GIF images are allowed'),
             false,
           );
         }

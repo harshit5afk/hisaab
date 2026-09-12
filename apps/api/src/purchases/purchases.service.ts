@@ -8,13 +8,16 @@ export class PurchasesService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(
-    filters: { vendor?: string; dateFrom?: string; dateTo?: string } = {},
+    filters: { vendor?: string; productId?: string; dateFrom?: string; dateTo?: string } = {},
     page = 1,
     limit = 20,
   ) {
     const where: any = { deletedAt: null };
     if (filters.vendor) {
       where.vendor = { contains: filters.vendor };
+    }
+    if (filters.productId) {
+      where.productId = filters.productId;
     }
     if (filters.dateFrom || filters.dateTo) {
       where.date = {};
@@ -27,6 +30,7 @@ export class PurchasesService {
         where,
         include: {
           creator: { select: { id: true, name: true, email: true } },
+          product: { select: { id: true, name: true, unit: true, hsn: true, stock: true } },
         },
         skip: (page - 1) * limit,
         take: limit,
@@ -43,6 +47,7 @@ export class PurchasesService {
       where: { id, deletedAt: null },
       include: {
         creator: { select: { id: true, name: true, email: true } },
+        product: { select: { id: true, name: true, unit: true, hsn: true, stock: true } },
       },
     });
     if (!purchase) throw new NotFoundException('Purchase not found');
@@ -50,15 +55,73 @@ export class PurchasesService {
   }
 
   async create(dto: CreatePurchaseDto, userId: string) {
-    return this.prisma.purchase.create({
-      data: {
-        ...dto,
-        date: new Date(dto.date),
-        createdBy: userId,
-      },
-      include: {
-        creator: { select: { id: true, name: true, email: true } },
-      },
+    const qty = dto.quantity ?? 1;
+
+    return this.prisma.$transaction(async (tx) => {
+      let productId = dto.productId;
+
+      // ✅ Auto-create or find product by name if productName is given
+      if (!productId && dto.productName?.trim()) {
+        const name = dto.productName.trim();
+
+        // Check if product already exists (exact or case-insensitive)
+        let existingProduct = await tx.product.findFirst({
+          where: { name, deletedAt: null },
+        });
+
+        if (!existingProduct) {
+          const allActive = await tx.product.findMany({
+            where: { deletedAt: null },
+          });
+          existingProduct = allActive.find(
+            (p) => p.name.trim().toLowerCase() === name.toLowerCase()
+          ) || null;
+        }
+
+        if (existingProduct) {
+          productId = existingProduct.id;
+        } else {
+          // Auto-create new product with purchase price per unit as rate
+          const ratePerUnit = qty > 0 ? Math.round(dto.amount / qty) : dto.amount;
+          const newProduct = await tx.product.create({
+            data: {
+              name,
+              unit: dto.unit?.trim() || 'NOS',
+              rate: ratePerUnit,
+              stock: 0, // incremented below
+            },
+          });
+          productId = newProduct.id;
+        }
+      }
+
+      // Create the purchase record linked to product
+      const purchase = await tx.purchase.create({
+        data: {
+          billNo: dto.billNo,
+          vendor: dto.vendor,
+          productId,
+          date: new Date(dto.date),
+          amount: dto.amount,
+          quantity: qty,
+          description: dto.description,
+          createdBy: userId,
+        },
+        include: {
+          creator: { select: { id: true, name: true, email: true } },
+          product: { select: { id: true, name: true, unit: true, hsn: true, stock: true } },
+        },
+      });
+
+      // ✅ Increment product stock by purchased quantity
+      if (productId) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { stock: { increment: qty } },
+        });
+      }
+
+      return purchase;
     });
   }
 
@@ -68,7 +131,7 @@ export class PurchasesService {
       where: { id },
       data: {
         ...(dto.billNo !== undefined && { billNo: dto.billNo }),
-        ...(dto.vendor && { vendor: dto.vendor }),
+        ...(dto.vendor !== undefined && { vendor: dto.vendor }),
         ...(dto.date && { date: new Date(dto.date) }),
         ...(dto.amount && { amount: dto.amount }),
         ...(dto.quantity !== undefined && { quantity: dto.quantity }),
@@ -78,10 +141,25 @@ export class PurchasesService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    return this.prisma.purchase.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    const purchase = await this.findOne(id);
+
+    return this.prisma.$transaction(async (tx) => {
+      // Soft-delete the purchase
+      const deleted = await tx.purchase.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      // ✅ Decrement product stock by the quantity that was purchased
+      if (purchase.productId) {
+        const qty = purchase.quantity ?? 1;
+        await tx.product.update({
+          where: { id: purchase.productId },
+          data: { stock: { decrement: qty } },
+        });
+      }
+
+      return deleted;
     });
   }
 }

@@ -20,13 +20,14 @@ export class PurchasesController {
   @Get()
   findAll(
     @Query('vendor') vendor?: string,
+    @Query('productId') productId?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.purchasesService.findAll(
-      { vendor, dateFrom, dateTo },
+      { vendor, productId, dateFrom, dateTo },
       page ? +page : 1,
       limit ? +limit : 20,
     );

@@ -1,7 +1,7 @@
 @echo off
-title Hisaab - Business Manager
+title Ion Shift Engineering - Business Manager
 echo ========================================
-echo   Hisaab - Business Management App
+echo   Ion Shift Engineering - Business Management App
 echo   Starting server...
 echo ========================================
 echo.

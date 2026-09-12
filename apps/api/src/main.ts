@@ -25,10 +25,21 @@ async function bootstrap() {
       credentials: true,
     });
   }
+  // SPA fallback: any GET request that doesn't match /api serves Angular index.html
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use((req: any, res: any, next: any) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api') && !req.path.includes('.')) {
+      const indexPath = require('path').join(__dirname, '..', '..', 'web', 'dist', 'web', 'browser', 'index.html');
+      return res.sendFile(indexPath, { dotfiles: 'allow' }, (err: any) => {
+        if (err) next();
+      });
+    }
+    next();
+  });
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`🚀 Hisaab running on http://localhost:${port}`);
+  console.log(`🚀 Ion Shift Engineering running on http://localhost:${port}`);
 }
 bootstrap();
 

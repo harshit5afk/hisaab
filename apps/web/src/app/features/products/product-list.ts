@@ -91,6 +91,33 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
           </td>
         </ng-container>
 
+        <ng-container matColumnDef="purchases">
+          <th mat-header-cell *matHeaderCellDef>Recent Bill & Purchase</th>
+          <td mat-cell *matCellDef="let p">
+            @if (p.purchases && p.purchases.length > 0) {
+              <div class="purchase-history-preview">
+                @if (p.purchases[0].billNo) {
+                  <span class="bill-badge">
+                    <mat-icon class="mini-icon">receipt</mat-icon>
+                    Bill #{{ p.purchases[0].billNo }}
+                  </span>
+                }
+                @if (p.purchases[0].vendor) {
+                  <span class="vendor-badge">
+                    <mat-icon class="mini-icon">storefront</mat-icon>
+                    {{ p.purchases[0].vendor }}
+                  </span>
+                }
+                <span class="date-badge">
+                  {{ p.purchases[0].date | date:'dd MMM yyyy' }}
+                </span>
+              </div>
+            } @else {
+              <span class="no-purchase">—</span>
+            }
+          </td>
+        </ng-container>
+
         <ng-container matColumnDef="hsn">
           <th mat-header-cell *matHeaderCellDef>HSN / SAC</th>
           <td mat-cell *matCellDef="let p">{{ p.hsn || '—' }}</td>
@@ -105,6 +132,17 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
           <th mat-header-cell *matHeaderCellDef>Default Rate</th>
           <td mat-cell *matCellDef="let p" class="rate-cell">
             {{ p.rate | paiseToRupees }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="stock">
+          <th mat-header-cell *matHeaderCellDef>Stock</th>
+          <td mat-cell *matCellDef="let p">
+            @if ((p.stock ?? 0) > 0) {
+              <span class="stock-badge stock-ok">{{ p.stock }} {{ p.unit }}</span>
+            } @else {
+              <span class="stock-badge stock-empty">Out of Stock</span>
+            }
           </td>
         </ng-container>
 
@@ -238,6 +276,24 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
       color: #38bdf8;
       font-variant-numeric: tabular-nums;
     }
+    .stock-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .stock-ok {
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(74, 222, 128, 0.3);
+    }
+    .stock-empty {
+      background: rgba(248, 113, 113, 0.12);
+      color: #f87171;
+      border: 1px solid rgba(248, 113, 113, 0.25);
+    }
     .action-cell {
       text-align: right;
     }
@@ -254,6 +310,48 @@ import { PaiseToRupeesPipe } from '../../shared/pipes/paise-to-rupees.pipe';
         opacity: 0.5;
       }
     }
+    .purchase-history-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .bill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      background: rgba(138, 180, 248, 0.15);
+      color: #8ab4f8;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.2px;
+    }
+    .vendor-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 0.74rem;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .date-badge {
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .mini-icon {
+      font-size: 13px;
+      width: 13px;
+      height: 13px;
+      line-height: 13px;
+    }
+    .no-purchase {
+      color: #64748b;
+      font-size: 0.85rem;
+    }
     @media (max-width: 768px) {
       .add-grid {
         grid-template-columns: 1fr;
@@ -268,7 +366,7 @@ export default class ProductList implements OnInit {
   showCreate = signal<boolean>(false);
   productToDelete = signal<Product | null>(null);
   isDeleting = signal<boolean>(false);
-  displayedColumns = ['name', 'hsn', 'unit', 'rate', 'actions'];
+  displayedColumns = ['name', 'purchases', 'hsn', 'unit', 'rate', 'stock', 'actions'];
 
   newProd = {
     name: '',

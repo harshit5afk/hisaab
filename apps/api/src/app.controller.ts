@@ -8,7 +8,7 @@ export class AppController {
   healthCheck() {
     return {
       status: 'ok',
-      app: 'Hisaab API',
+      app: 'Ion Shift Engineering API',
       version: '0.0.1',
       timestamp: new Date().toISOString(),
     };

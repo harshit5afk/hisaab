@@ -69,7 +69,7 @@ export class InvoicePdfService {
     const customerState = customer.state || this.extractState(customer.address);
 
     const html = template({
-      businessName: process.env.BUSINESS_NAME || 'Sharma Traders',
+      businessName: process.env.BUSINESS_NAME || 'Ion Shift Engineering',
       businessAddress: process.env.BUSINESS_ADDRESS || 'Bangalore, Karnataka',
       businessCity: process.env.BUSINESS_CITY || 'Pincode: 560058',
       businessGstin: process.env.BUSINESS_GSTIN || '29AAAPS1234A1Z5',

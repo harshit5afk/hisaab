@@ -20,6 +20,21 @@ export class ProductsService {
     const [data, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
+        include: {
+          purchases: {
+            where: { deletedAt: null },
+            orderBy: { date: 'desc' },
+            take: 5,
+            select: {
+              id: true,
+              billNo: true,
+              vendor: true,
+              date: true,
+              amount: true,
+              quantity: true,
+            },
+          },
+        },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { name: 'asc' },
@@ -33,6 +48,20 @@ export class ProductsService {
   async findOne(id: string) {
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
+      include: {
+        purchases: {
+          where: { deletedAt: null },
+          orderBy: { date: 'desc' },
+          select: {
+            id: true,
+            billNo: true,
+            vendor: true,
+            date: true,
+            amount: true,
+            quantity: true,
+          },
+        },
+      },
     });
     if (!product) throw new NotFoundException('Product not found');
     return product;

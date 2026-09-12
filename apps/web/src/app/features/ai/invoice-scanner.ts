@@ -1,4 +1,5 @@
 import { Component, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -101,7 +102,9 @@ export default class InvoiceScanner {
   constructor(private aiApi: AiApiService, private router: Router, private snackBar: MatSnackBar) {}
 
   onFileSelected(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
     if (file) this.processFile(file);
   }
 
@@ -112,6 +115,16 @@ export default class InvoiceScanner {
   }
 
   private processFile(file: File) {
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!supportedTypes.includes(file.type)) {
+      this.snackBar.open('Please choose a JPEG, PNG, WEBP, or GIF image.', 'OK', { duration: 5000 });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      this.snackBar.open('The invoice image must be smaller than 10 MB.', 'OK', { duration: 5000 });
+      return;
+    }
+
     this.selectedFile = file;
     const reader = new FileReader();
     reader.onload = () => this.preview.set(reader.result as string);
@@ -122,9 +135,10 @@ export default class InvoiceScanner {
 
     this.aiApi.extractInvoice(file).subscribe({
       next: (data) => { this.result.set(data); this.loading.set(false); },
-      error: () => {
+      error: (error: HttpErrorResponse) => {
         this.loading.set(false);
-        this.snackBar.open('AI extraction failed. Please enter data manually.', 'OK', { duration: 5000 });
+        const message = error.error?.message || 'AI extraction failed. Please enter data manually.';
+        this.snackBar.open(message, 'OK', { duration: 7000 });
       },
     });
   }

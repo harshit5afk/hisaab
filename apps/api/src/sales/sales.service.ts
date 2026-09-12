@@ -98,76 +98,106 @@ export class SalesService {
     });
     if (!customer) throw new BadRequestException('Customer not found');
 
-    // Generate invoice number atomically
-    const invoiceNo = await this.generateInvoiceNumber();
+    return this.prisma.$transaction(async (tx) => {
+      // Generate invoice number atomically
+      const invoiceNo = await this.generateInvoiceNumber(tx);
 
-    // Sanitize items and force verified line totals (qty * rate)
-    const sanitizedItems = dto.items.map((i) => {
-      const qty = Number(i.qty);
-      const rate = Number(i.rate);
-      return {
-        productId: i.productId?.trim() || undefined,
-        name: i.name.trim(),
-        hsn: i.hsn?.trim() || '',
-        qty,
-        rate,
-        total: Math.round(qty * rate * 100) / 100,
-      };
-    });
+      // Fetch active products for name-based fallback matching
+      const allActiveProducts = await tx.product.findMany({
+        where: { deletedAt: null },
+        select: { id: true, name: true },
+      });
 
-    // Server-side subtotal calculation from items (in paise)
-    const amount = sanitizedItems.reduce((sum, item) => {
-      return sum + Math.round(item.qty * item.rate * 100);
-    }, 0);
+      // Sanitize items and decrement stock for products sold
+      const sanitizedItems = [];
+      for (const i of dto.items) {
+        const qty = Number(i.qty);
+        const rate = Number(i.rate);
+        const trimmedName = i.name.trim();
 
-    // GST calculations
-    const isGstInvoice = Boolean(dto.isGstInvoice);
-    const taxRate = isGstInvoice ? (dto.taxRate !== undefined ? Number(dto.taxRate) : 18) : 0;
-    const otherAmount = dto.otherAmount ? Math.max(0, Math.round(Number(dto.otherAmount))) : 0;
+        let resolvedProductId = i.productId?.trim() || undefined;
 
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
+        if (!resolvedProductId && trimmedName) {
+          const matched = allActiveProducts.find(
+            (p) => p.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+          );
+          if (matched) {
+            resolvedProductId = matched.id;
+          }
+        }
 
-    if (isGstInvoice && taxRate > 0) {
-      const businessState = (process.env.BUSINESS_STATE || 'RAJASTHAN').trim().toUpperCase();
-      const customerState = (customer.state || '').trim().toUpperCase();
-      const isSameState = !customerState || customerState === businessState;
-      const totalTax = Math.round((amount * taxRate) / 100);
+        // ✅ REDUCE STOCK for sold product
+        if (resolvedProductId && qty > 0) {
+          await tx.product.update({
+            where: { id: resolvedProductId },
+            data: { stock: { decrement: qty } },
+          });
+        }
 
-      if (isSameState) {
-        cgst = Math.round(totalTax / 2);
-        sgst = totalTax - cgst; // exact reconciliation prevents 1-paisa rounding errors
-      } else {
-        igst = totalTax;
+        sanitizedItems.push({
+          productId: resolvedProductId,
+          name: trimmedName,
+          hsn: i.hsn?.trim() || '',
+          qty,
+          rate,
+          total: Math.round(qty * rate * 100) / 100,
+        });
       }
-    }
 
-    const totalAmount = amount + cgst + sgst + igst + otherAmount;
+      // Server-side subtotal calculation from items (in paise)
+      const amount = sanitizedItems.reduce((sum, item) => {
+        return sum + Math.round(item.qty * item.rate * 100);
+      }, 0);
 
-    const description =
-      dto.description ||
-      (sanitizedItems.length > 0
-        ? sanitizedItems.map((i) => i.name).filter(Boolean).join(', ')
-        : null);
+      // GST calculations
+      const isGstInvoice = Boolean(dto.isGstInvoice);
+      const taxRate = isGstInvoice ? (dto.taxRate !== undefined ? Number(dto.taxRate) : 18) : 0;
+      const otherAmount = dto.otherAmount ? Math.max(0, Math.round(Number(dto.otherAmount))) : 0;
 
-    return this.prisma.invoice.create({
-      data: {
-        invoiceNo,
-        customerId,
-        date: new Date(dto.date),
-        amount,
-        isGstInvoice,
-        taxRate: isGstInvoice ? taxRate : null,
-        cgst,
-        sgst,
-        igst,
-        otherAmount,
-        totalAmount,
-        description,
-        items: sanitizedItems as any,
-      },
-      include: { customer: { select: { id: true, name: true, phone: true, state: true } } },
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+
+      if (isGstInvoice && taxRate > 0) {
+        const businessState = (process.env.BUSINESS_STATE || 'RAJASTHAN').trim().toUpperCase();
+        const customerState = (customer.state || '').trim().toUpperCase();
+        const isSameState = !customerState || customerState === businessState;
+        const totalTax = Math.round((amount * taxRate) / 100);
+
+        if (isSameState) {
+          cgst = Math.round(totalTax / 2);
+          sgst = totalTax - cgst; // exact reconciliation prevents 1-paisa rounding errors
+        } else {
+          igst = totalTax;
+        }
+      }
+
+      const totalAmount = amount + cgst + sgst + igst + otherAmount;
+
+      const description =
+        dto.description ||
+        (sanitizedItems.length > 0
+          ? sanitizedItems.map((i) => i.name).filter(Boolean).join(', ')
+          : null);
+
+      return tx.invoice.create({
+        data: {
+          invoiceNo,
+          customerId,
+          date: new Date(dto.date),
+          amount,
+          isGstInvoice,
+          taxRate: isGstInvoice ? taxRate : null,
+          cgst,
+          sgst,
+          igst,
+          otherAmount,
+          totalAmount,
+          description,
+          items: sanitizedItems as any,
+        },
+        include: { customer: { select: { id: true, name: true, phone: true, state: true } } },
+      });
     });
   }
 
@@ -190,75 +220,115 @@ export class SalesService {
       );
     }
 
-    let updateAmount = invoice.amount;
-    let sanitizedItems = undefined;
+    return this.prisma.$transaction(async (tx) => {
+      let updateAmount = invoice.amount;
+      let sanitizedItems = undefined;
 
-    if (dto.items && dto.items.length > 0) {
-      sanitizedItems = dto.items.map((i) => {
-        const qty = Number(i.qty);
-        const rate = Number(i.rate);
-        return {
-          productId: i.productId?.trim() || undefined,
-          name: i.name.trim(),
-          hsn: i.hsn?.trim() || '',
-          qty,
-          rate,
-          total: Math.round(qty * rate * 100) / 100,
-        };
-      });
-      updateAmount = sanitizedItems.reduce(
-        (sum, item) => sum + Math.round(item.qty * item.rate * 100),
-        0,
-      );
-    } else if (dto.amount !== undefined) {
-      updateAmount = dto.amount;
-    }
+      if (dto.items && dto.items.length > 0) {
+        // 1. Revert previous stock deduction from old items
+        if (Array.isArray(invoice.items)) {
+          for (const oldItem of invoice.items as any[]) {
+            const oldQty = Number(oldItem.qty) || 0;
+            if (oldQty > 0 && oldItem.productId) {
+              await tx.product.update({
+                where: { id: oldItem.productId },
+                data: { stock: { increment: oldQty } },
+              }).catch(() => {});
+            }
+          }
+        }
 
-    const isGstInvoice =
-      dto.isGstInvoice !== undefined ? Boolean(dto.isGstInvoice) : invoice.isGstInvoice;
-    const taxRate =
-      dto.taxRate !== undefined
-        ? Number(dto.taxRate)
-        : (invoice.taxRate ?? (isGstInvoice ? 18 : 0));
-    const otherAmount =
-      dto.otherAmount !== undefined ? Math.round(Number(dto.otherAmount)) : invoice.otherAmount;
+        const allActiveProducts = await tx.product.findMany({
+          where: { deletedAt: null },
+          select: { id: true, name: true },
+        });
 
-    let cgst = 0;
-    let sgst = 0;
-    let igst = 0;
+        // 2. Apply new stock deduction for new items
+        sanitizedItems = [];
+        for (const i of dto.items) {
+          const qty = Number(i.qty);
+          const rate = Number(i.rate);
+          const trimmedName = i.name.trim();
 
-    if (isGstInvoice && taxRate > 0) {
-      const businessState = (process.env.BUSINESS_STATE || 'RAJASTHAN').trim().toUpperCase();
-      const customerState = (invoice.customer?.state || '').trim().toUpperCase();
-      const isSameState = !customerState || customerState === businessState;
-      const totalTax = Math.round((updateAmount * taxRate) / 100);
+          let resolvedProductId = i.productId?.trim() || undefined;
+          if (!resolvedProductId && trimmedName) {
+            const matched = allActiveProducts.find(
+              (p) => p.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+            );
+            if (matched) resolvedProductId = matched.id;
+          }
 
-      if (isSameState) {
-        cgst = Math.round(totalTax / 2);
-        sgst = totalTax - cgst;
-      } else {
-        igst = totalTax;
+          if (resolvedProductId && qty > 0) {
+            await tx.product.update({
+              where: { id: resolvedProductId },
+              data: { stock: { decrement: qty } },
+            });
+          }
+
+          sanitizedItems.push({
+            productId: resolvedProductId,
+            name: trimmedName,
+            hsn: i.hsn?.trim() || '',
+            qty,
+            rate,
+            total: Math.round(qty * rate * 100) / 100,
+          });
+        }
+
+        updateAmount = sanitizedItems.reduce(
+          (sum, item) => sum + Math.round(item.qty * item.rate * 100),
+          0,
+        );
+      } else if (dto.amount !== undefined) {
+        updateAmount = dto.amount;
       }
-    }
 
-    const totalAmount = updateAmount + cgst + sgst + igst + otherAmount;
+      const isGstInvoice =
+        dto.isGstInvoice !== undefined ? Boolean(dto.isGstInvoice) : invoice.isGstInvoice;
+      const taxRate =
+        dto.taxRate !== undefined
+          ? Number(dto.taxRate)
+          : (invoice.taxRate ?? (isGstInvoice ? 18 : 0));
+      const otherAmount =
+        dto.otherAmount !== undefined ? Math.round(Number(dto.otherAmount)) : invoice.otherAmount;
 
-    return this.prisma.invoice.update({
-      where: { id },
-      data: {
-        ...(dto.date && { date: new Date(dto.date) }),
-        amount: updateAmount,
-        isGstInvoice,
-        taxRate: isGstInvoice ? taxRate : null,
-        cgst,
-        sgst,
-        igst,
-        otherAmount,
-        totalAmount,
-        ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.status && { status: dto.status }),
-        ...(sanitizedItems && { items: sanitizedItems as any }),
-      },
+      let cgst = 0;
+      let sgst = 0;
+      let igst = 0;
+
+      if (isGstInvoice && taxRate > 0) {
+        const businessState = (process.env.BUSINESS_STATE || 'RAJASTHAN').trim().toUpperCase();
+        const customerState = (invoice.customer?.state || '').trim().toUpperCase();
+        const isSameState = !customerState || customerState === businessState;
+        const totalTax = Math.round((updateAmount * taxRate) / 100);
+
+        if (isSameState) {
+          cgst = Math.round(totalTax / 2);
+          sgst = totalTax - cgst;
+        } else {
+          igst = totalTax;
+        }
+      }
+
+      const totalAmount = updateAmount + cgst + sgst + igst + otherAmount;
+
+      return tx.invoice.update({
+        where: { id },
+        data: {
+          ...(dto.date && { date: new Date(dto.date) }),
+          amount: updateAmount,
+          isGstInvoice,
+          taxRate: isGstInvoice ? taxRate : null,
+          cgst,
+          sgst,
+          igst,
+          otherAmount,
+          totalAmount,
+          ...(dto.description !== undefined && { description: dto.description }),
+          ...(dto.status && { status: dto.status }),
+          ...(sanitizedItems && { items: sanitizedItems as any }),
+        },
+      });
     });
   }
 
@@ -267,9 +337,25 @@ export class SalesService {
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException('Can only delete draft invoices');
     }
-    return this.prisma.invoice.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+
+    return this.prisma.$transaction(async (tx) => {
+      // ✅ Revert stock for all items
+      if (Array.isArray(invoice.items)) {
+        for (const item of invoice.items as any[]) {
+          const qty = Number(item.qty) || 0;
+          if (qty > 0 && item.productId) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: qty } },
+            }).catch(() => {});
+          }
+        }
+      }
+
+      return tx.invoice.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
     });
   }
 
@@ -277,17 +363,16 @@ export class SalesService {
    * Atomic invoice number generation using a sequence table.
    * Format: INV/YY-YY/0001
    */
-  private async generateInvoiceNumber(): Promise<string> {
-    return this.prisma.$transaction(async (tx) => {
-      const seq = await tx.sequence.upsert({
-        where: { id: 'invoice_seq' },
-        update: { current: { increment: 1 } },
-        create: { id: 'invoice_seq', current: 1 },
-      });
-
-      const fy = this.getFiscalYear();
-      return `INV/${fy}/${String(seq.current).padStart(4, '0')}`;
+  private async generateInvoiceNumber(tx?: any): Promise<string> {
+    const client = tx || this.prisma;
+    const seq = await client.sequence.upsert({
+      where: { id: 'invoice_seq' },
+      update: { current: { increment: 1 } },
+      create: { id: 'invoice_seq', current: 1 },
     });
+
+    const fy = this.getFiscalYear();
+    return `INV/${fy}/${String(seq.current).padStart(4, '0')}`;
   }
 
   /** Returns current Indian fiscal year, e.g. "26-27" */

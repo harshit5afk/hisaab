@@ -94,8 +94,9 @@ export default class AiQuery {
         this.loading.set(false);
         this.question = '';
       },
-      error: () => {
-        this.answer.set('Sorry, I could not process that query. Please try again.');
+      error: (err) => {
+        const message = err.error?.message || 'AI service is unavailable. Please try again.';
+        this.answer.set(message);
         this.loading.set(false);
       },
     });
