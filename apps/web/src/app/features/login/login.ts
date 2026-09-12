@@ -25,7 +25,7 @@ import { AuthService } from '../../core/auth/auth.service';
     <div class="login-container">
       <div class="login-card">
         <div class="login-header">
-          <div class="logo-icon">₹</div>
+          <img class="logo-icon" src="ion-shift-logo.png" alt="Ion Shift Engineering logo" />
           <h1>Ion Shift Engineering</h1>
           <p class="subtitle">Accounting & Business Management</p>
         </div>
@@ -151,11 +151,8 @@ import { AuthService } from '../../core/auth/auth.service';
         justify-content: center;
         width: 60px;
         height: 60px;
-        background: var(--gradient-primary);
+        object-fit: cover;
         border-radius: 16px;
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: white;
         margin-bottom: 12px;
         box-shadow: 0 8px 24px rgba(103, 80, 164, 0.35);
       }
