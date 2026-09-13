@@ -21,7 +21,7 @@ import { ProductsModule } from './products/products.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '../../.env', // root-level .env
+      envFilePath: ['.env', 'apps/api/.env', '../../.env'],
     }),
     // Serve Angular production build from NestJS (single URL setup)
     ServeStaticModule.forRoot({

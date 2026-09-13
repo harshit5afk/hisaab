@@ -35,7 +35,7 @@ interface NavItem {
           <div class="logo" (click)="toggleSidebar()">
             <span class="logo-icon">₹</span>
             @if (!sidebarCollapsed()) {
-              <span class="logo-text">Hisaab</span>
+              <span class="logo-text">Ion Shift Engineering</span>
             }
           </div>
         </div>

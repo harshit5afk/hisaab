@@ -337,6 +337,9 @@ export interface InvoiceLineItem {
                               @if (p.hsn) {
                                 <span class="p-hsn-badge">HSN: {{ p.hsn }}</span>
                               }
+                              <span class="p-stock-badge" [class.p-stock-low]="(p.stock ?? 0) <= 0">
+                                Stock: {{ p.stock ?? 0 }} {{ p.unit }}
+                              </span>
                             </div>
                             <div class="p-rate">
                               ₹ {{ (p.rate / 100).toFixed(2) }}
@@ -1006,6 +1009,18 @@ export interface InvoiceLineItem {
           border-radius: 4px;
           color: #94a3b8;
         }
+        .p-stock-badge {
+          font-size: 10px;
+          background: rgba(74, 222, 128, 0.12);
+          padding: 2px 6px;
+          border-radius: 4px;
+          color: #4ade80;
+          font-weight: 600;
+        }
+        .p-stock-low {
+          background: rgba(248, 113, 113, 0.12);
+          color: #f87171;
+        }
       }
       .p-rate {
         color: #38bdf8;
@@ -1665,14 +1680,23 @@ export default class InvoiceForm implements OnInit {
     this.isSubmitting.set(true);
     const v = this.form.value;
 
-    const itemsPayload = this.lineItems().map((i) => ({
-      productId: i.productId || undefined,
-      name: i.name.trim(),
-      hsn: i.hsn?.trim() || undefined,
-      qty: Number(i.qty),
-      rate: Number(i.rate),
-      total: Number(i.total),
-    }));
+    const itemsPayload = this.lineItems().map((i) => {
+      let productId = i.productId;
+      if (!productId && i.name) {
+        const found = this.allProducts().find(
+          (p) => p.name.toLowerCase() === i.name.trim().toLowerCase(),
+        );
+        if (found) productId = found.id;
+      }
+      return {
+        productId: productId || undefined,
+        name: i.name.trim(),
+        hsn: i.hsn?.trim() || undefined,
+        qty: Number(i.qty),
+        rate: Number(i.rate),
+        total: Number(i.total),
+      };
+    });
 
     const isGst = this.isGstInvoice();
     const otherPaise = Math.round((Number(v.otherAmountRupees) || 0) * 100);
@@ -1699,7 +1723,7 @@ export default class InvoiceForm implements OnInit {
     this.salesApi.create(payload).subscribe({
       next: () => {
         this.isSubmitting.set(false);
-        this.snackBar.open('Invoice created successfully!', 'OK', { duration: 3000 });
+        this.snackBar.open('Invoice created successfully! Product stock reduced.', 'OK', { duration: 3500 });
         this.router.navigate(['/sales']);
       },
       error: (err) => {

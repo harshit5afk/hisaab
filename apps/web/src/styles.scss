@@ -555,3 +555,61 @@ html[data-theme='dark'] .mat-mdc-form-field,
   }
 }
 
+/* ─────────────────────────────────────────────────────────── */
+/* BULK ACTION BAR & SELECTION STYLES                         */
+/* ─────────────────────────────────────────────────────────── */
+.bulk-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  padding: 10px 18px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  animation: bulkBarSlide 0.2s ease-out;
+
+  .bulk-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 500;
+    color: #e2e8f0;
+    font-size: 14px;
+  }
+
+  .bulk-count {
+    background: #0284c7;
+    color: #ffffff;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.4);
+  }
+
+  .bulk-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
+@keyframes bulkBarSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.select-col {
+  width: 48px;
+  padding-left: 16px !important;
+  padding-right: 0 !important;
+}
+

@@ -20,6 +20,22 @@ export class ProductsService {
     const [data, total] = await Promise.all([
       this.prisma.product.findMany({
         where,
+        include: {
+          purchases: {
+            where: { deletedAt: null },
+            orderBy: { date: 'desc' },
+            take: 5,
+            select: {
+              id: true,
+              billNo: true,
+              vendor: true,
+              date: true,
+              amount: true,
+              quantity: true,
+              rate: true,
+            },
+          },
+        },
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { name: 'asc' },
@@ -33,6 +49,21 @@ export class ProductsService {
   async findOne(id: string) {
     const product = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
+      include: {
+        purchases: {
+          where: { deletedAt: null },
+          orderBy: { date: 'desc' },
+          select: {
+            id: true,
+            billNo: true,
+            vendor: true,
+            date: true,
+            amount: true,
+            quantity: true,
+            rate: true,
+          },
+        },
+      },
     });
     if (!product) throw new NotFoundException('Product not found');
     return product;
@@ -66,6 +97,14 @@ export class ProductsService {
     await this.findOne(id);
     return this.prisma.product.update({
       where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async removeMany(ids: string[]) {
+    if (!ids || ids.length === 0) return { count: 0 };
+    return this.prisma.product.updateMany({
+      where: { id: { in: ids }, deletedAt: null },
       data: { deletedAt: new Date() },
     });
   }

@@ -12,6 +12,8 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 
+import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
+
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -27,6 +29,11 @@ export class ProductsController {
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
     );
+  }
+
+  @Post('bulk-delete')
+  bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.productsService.removeMany(dto.ids);
   }
 
   @Get(':id')

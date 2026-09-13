@@ -25,4 +25,8 @@ export class PurchasesApiService extends ApiService {
   delete(id: string): Observable<any> {
     return this.http.delete(`${this.apiUrl}/purchases/${id}`);
   }
+
+  deleteMany(ids: string[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/purchases/bulk-delete`, { ids });
+  }
 }

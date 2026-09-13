@@ -26,7 +26,7 @@ import { AuthService } from '../../core/auth/auth.service';
       <div class="login-card">
         <div class="login-header">
           <div class="logo-icon">₹</div>
-          <h1>Hisaab</h1>
+          <h1>Ion Shift Engineering</h1>
           <p class="subtitle">Accounting & Business Management</p>
         </div>
 
@@ -34,7 +34,7 @@ import { AuthService } from '../../core/auth/auth.service';
         <div class="quick-demo-banner">
           <div class="demo-info">
             <span class="badge">Demo Access</span>
-            <p>Try Hisaab instantly without typing credentials</p>
+            <p>Try Ion Shift Engineering instantly without typing credentials</p>
           </div>
           <button
             mat-flat-button
@@ -113,9 +113,9 @@ import { AuthService } from '../../core/auth/auth.service';
           </button>
         </form>
 
-        <div class="demo-credentials" (click)="fillDemoCredentials()" title="Click to auto-fill">
-          <p>Demo credentials (click to auto-fill):</p>
-          <code>admin&#64;hisaab.app / admin123</code>
+        <div class="demo-credentials" (click)="fillDemoCredentials()" title="Click to sign in instantly">
+          <p>Demo credentials (click to sign in instantly):</p>
+          <code>admin&#64;gmail.com / admin123</code>
         </div>
       </div>
     </div>
@@ -337,16 +337,21 @@ export default class Login {
       },
       error: (err) => {
         this.demoLoading.set(false);
-        this.errorMessage.set(
-          err.error?.message || 'Failed to start demo session',
-        );
+        if (err.status === 0 || err.status === 502 || err.status === 503 || err.status === 504) {
+          this.errorMessage.set('Backend server is not reachable. Please check if the API is running on port 3000.');
+        } else {
+          this.errorMessage.set(
+            err.error?.message || 'Failed to start demo session',
+          );
+        }
       },
     });
   }
 
   fillDemoCredentials() {
-    this.email = 'admin@hisaab.app';
+    this.email = 'admin@gmail.com';
     this.password = 'admin123';
+    this.login();
   }
 
   login() {
@@ -364,9 +369,13 @@ export default class Login {
       },
       error: (err) => {
         this.loading.set(false);
-        this.errorMessage.set(
-          err.error?.message || 'Invalid email or password',
-        );
+        if (err.status === 0 || err.status === 502 || err.status === 503 || err.status === 504) {
+          this.errorMessage.set('Backend server is not reachable. Please check if the API is running on port 3000.');
+        } else {
+          this.errorMessage.set(
+            err.error?.message || 'Invalid email or password',
+          );
+        }
       },
     });
   }

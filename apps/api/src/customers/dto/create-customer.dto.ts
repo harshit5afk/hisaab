@@ -8,20 +8,31 @@ export class CreateCustomerDto {
   name: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string' && value.trim() === '') return undefined;
+    return typeof value === 'string' ? value.trim() : value;
+  })
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   phone?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string' && value.trim() === '') return undefined;
+    return typeof value === 'string' ? value.trim() : value;
+  })
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   address?: string;
 
   @IsOptional()
   @Transform(({ value }) => {
-    if (typeof value !== 'string') return value;
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed.toUpperCase();
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed === '' ? undefined : trimmed.toUpperCase();
+    }
+    return value;
   })
   @ValidateIf((o) => typeof o.gstin === 'string' && o.gstin.trim() !== '')
   @Matches(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, {
@@ -30,7 +41,11 @@ export class CreateCustomerDto {
   gstin?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string' && value.trim() === '') return undefined;
+    return typeof value === 'string' ? value.trim() : value;
+  })
   @IsString()
-  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   state?: string;
 }

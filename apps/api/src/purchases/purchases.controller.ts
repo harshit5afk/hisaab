@@ -13,6 +13,8 @@ import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
+
 @Controller('purchases')
 export class PurchasesController {
   constructor(private purchasesService: PurchasesService) {}
@@ -20,16 +22,22 @@ export class PurchasesController {
   @Get()
   findAll(
     @Query('vendor') vendor?: string,
+    @Query('productId') productId?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.purchasesService.findAll(
-      { vendor, dateFrom, dateTo },
+      { vendor, productId, dateFrom, dateTo },
       page ? +page : 1,
       limit ? +limit : 20,
     );
+  }
+
+  @Post('bulk-delete')
+  bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.purchasesService.removeMany(dto.ids);
   }
 
   @Get(':id')

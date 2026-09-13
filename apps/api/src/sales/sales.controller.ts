@@ -17,6 +17,7 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
 
 @Controller('sales')
 export class SalesController {
@@ -60,9 +61,10 @@ export class SalesController {
 
     const pdfBuffer = await this.invoicePdfService.generatePdf(invoice, customer);
 
+    const safeInvoiceNo = (invoice.invoiceNo || 'invoice').replace(/[/\\?%*:|"<>]/g, '-');
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${invoice.invoiceNo}.pdf"`,
+      'Content-Disposition': `attachment; filename="${safeInvoiceNo}.pdf"`,
     });
     res.send(pdfBuffer);
   }
@@ -78,6 +80,11 @@ export class SalesController {
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateInvoiceDto) {
     return this.salesService.update(id, dto);
+  }
+
+  @Post('bulk-delete')
+  bulkDelete(@Body() dto: BulkDeleteDto) {
+    return this.salesService.removeMany(dto.ids);
   }
 
   @Delete(':id')

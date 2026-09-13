@@ -2,12 +2,24 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 
+export interface ProductPurchase {
+  id: string;
+  billNo?: string;
+  vendor?: string;
+  date: string;
+  amount: number; // in paise
+  quantity?: number;
+  rate?: number; // purchase unit rate in paise
+}
+
 export interface Product {
   id: string;
   name: string;
   hsn?: string;
   unit: string;
   rate: number; // in paise
+  stock: number; // current inventory quantity
+  purchases?: ProductPurchase[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -34,5 +46,9 @@ export class ProductsApiService extends ApiService {
 
   delete(id: string): Observable<any> {
     return this.http.delete(`${this.apiUrl}/products/${id}`);
+  }
+
+  deleteMany(ids: string[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/products/bulk-delete`, { ids });
   }
 }

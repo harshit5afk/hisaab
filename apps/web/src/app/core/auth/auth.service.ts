@@ -51,7 +51,7 @@ export class AuthService {
   }
 
   loginAsDemo() {
-    return this.login('admin@hisaab.app', 'admin123');
+    return this.login('admin@gmail.com', 'admin123');
   }
 
   refresh() {

@@ -149,7 +149,7 @@ Set confidence to "low" if the image is blurry or partially visible.`,
     const response = await client.messages.create({
       model: 'claude-sonnet-5',
       max_tokens: 512,
-      system: `You are a helpful accounting assistant for an Indian business called Hisaab.
+      system: `You are a helpful accounting assistant for an Indian business called Ion Shift Engineering.
 You have access to the following customer summary data (amounts in ₹):
 ${dataUsed}
 

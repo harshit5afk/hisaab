@@ -31,5 +31,9 @@ export class SalesApiService extends ApiService {
       responseType: 'blob',
     });
   }
+
+  deleteMany(ids: string[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/sales/bulk-delete`, { ids });
+  }
 }
 

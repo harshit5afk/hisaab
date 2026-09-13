@@ -1,13 +1,21 @@
-import { IsNotEmpty, IsString, IsInt, IsOptional, IsDateString, IsNumber, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, IsOptional, IsDateString, IsNumber, IsUUID, Min } from 'class-validator';
 
 export class CreatePurchaseDto {
   @IsOptional()
   @IsString()
   billNo?: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  vendor: string;
+  vendor?: string;
+
+  @IsOptional()
+  @IsUUID()
+  productId?: string;
+
+  @IsOptional()
+  @IsString()
+  productName?: string; // if no productId, auto-create product with this name
 
   @IsDateString()
   date: string;
@@ -20,6 +28,15 @@ export class CreatePurchaseDto {
   @IsNumber()
   @Min(0.01)
   quantity?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  rate?: number; // purchase unit rate in paise
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
 
   @IsOptional()
   @IsString()

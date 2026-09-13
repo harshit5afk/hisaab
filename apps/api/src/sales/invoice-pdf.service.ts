@@ -10,7 +10,18 @@ export class InvoicePdfService {
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (!customer) throw new NotFoundException('Customer not found');
 
-    const templatePath = path.join(process.cwd(), 'dist', 'templates', 'invoice.hbs');
+    const possiblePaths = [
+      path.join(__dirname, '..', 'templates', 'invoice.hbs'),
+      path.join(__dirname, 'templates', 'invoice.hbs'),
+      path.join(process.cwd(), 'apps', 'api', 'dist', 'templates', 'invoice.hbs'),
+      path.join(process.cwd(), 'apps', 'api', 'src', 'templates', 'invoice.hbs'),
+      path.join(process.cwd(), 'dist', 'templates', 'invoice.hbs'),
+      path.join(process.cwd(), 'src', 'templates', 'invoice.hbs'),
+    ];
+    const templatePath = possiblePaths.find((p) => fs.existsSync(p));
+    if (!templatePath) {
+      throw new Error(`Invoice template invoice.hbs not found in: ${possiblePaths.join(', ')}`);
+    }
     const templateHtml = fs.readFileSync(templatePath, 'utf-8');
     const template = handlebars.compile(templateHtml);
 
@@ -69,7 +80,7 @@ export class InvoicePdfService {
     const customerState = customer.state || this.extractState(customer.address);
 
     const html = template({
-      businessName: process.env.BUSINESS_NAME || 'Sharma Traders',
+      businessName: process.env.BUSINESS_NAME || 'Ion Shift Engineering',
       businessAddress: process.env.BUSINESS_ADDRESS || 'Bangalore, Karnataka',
       businessCity: process.env.BUSINESS_CITY || 'Pincode: 560058',
       businessGstin: process.env.BUSINESS_GSTIN || '29AAAPS1234A1Z5',

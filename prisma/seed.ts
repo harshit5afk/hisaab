@@ -23,7 +23,7 @@ async function main() {
   const admin = await prisma.user.create({
     data: {
       name: 'Admin',
-      email: 'admin@hisaab.app',
+      email: 'admin@gmail.com',
       passwordHash,
       role: 'OWNER',
     },
@@ -31,8 +31,8 @@ async function main() {
 
   const owner = await prisma.user.create({
     data: {
-      name: 'Rajesh Sharma',
-      email: 'rajesh@sharmatraders.in',
+      name: 'Rajesh Kumar',
+      email: 'rajesh@ionshift.in',
       passwordHash,
       role: 'OWNER',
     },
@@ -41,7 +41,7 @@ async function main() {
   const staff = await prisma.user.create({
     data: {
       name: 'Anita Verma',
-      email: 'anita@sharmatraders.in',
+      email: 'anita@ionshift.in',
       passwordHash: await bcrypt.hash('staff123', 12),
       role: 'STAFF',
     },
