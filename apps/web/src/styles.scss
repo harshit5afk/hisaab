@@ -44,6 +44,8 @@ html[data-theme='dark'] {
   --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 16px 36px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.5);
+  --table-header-bg: rgba(15, 23, 42, 0.7);
+  --table-row-hover: rgba(56, 189, 248, 0.08);
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 20px;
@@ -66,6 +68,35 @@ html[data-theme='dark'] {
   --mat-form-field-focus-label-text-color: #38bdf8;
   --mat-select-trigger-text-color: #f8fafc;
   --mat-select-placeholder-text-color: #94a3b8;
+}
+
+html[data-theme='light'] {
+  --bg-primary: #f3f6fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-elevated: #eef3f8;
+  --border-color: rgba(31, 51, 73, 0.14);
+  --text-primary: #172331;
+  --text-secondary: #536577;
+  --text-muted: #708294;
+  --accent-indigo: #2563a8;
+  --accent-violet: #6d4bb3;
+  --accent-green: #16845b;
+  --accent-red: #c24141;
+  --accent-amber: #a56800;
+  --accent-cyan: #087f9b;
+  --sidebar-start: #e7eef5;
+  --sidebar-end: #f8fafc;
+  --sidebar-text: #40566a;
+  --sidebar-hover: rgba(37, 99, 168, 0.08);
+  --sidebar-active: linear-gradient(135deg, rgba(37, 99, 168, 0.14), rgba(109, 75, 179, 0.12));
+  --topbar-bg: rgba(255, 255, 255, 0.9);
+  --page-bg: linear-gradient(180deg, #f8fafc, #edf2f7);
+  --shadow-sm: 0 8px 24px rgba(31, 51, 73, 0.08);
+  --shadow-md: 0 16px 36px rgba(31, 51, 73, 0.12);
+  --shadow-lg: 0 24px 48px rgba(31, 51, 73, 0.16);
+  --table-header-bg: #e2eaf2;
+  --table-row-hover: rgba(37, 99, 168, 0.08);
 }
 
 *,
@@ -175,34 +206,34 @@ html, body {
 
 .mat-mdc-table {
   background: transparent !important;
-  --mat-table-header-headline-color: #93c5fd;
-  --mat-table-row-item-label-text-color: #f1f5f9;
-  --mat-table-row-item-outline-color: rgba(255, 255, 255, 0.08);
+  --mat-table-header-headline-color: var(--accent-indigo);
+  --mat-table-row-item-label-text-color: var(--text-primary);
+  --mat-table-row-item-outline-color: var(--border-color);
 
   th.mat-mdc-header-cell {
-    color: #93c5fd !important;
+    color: var(--accent-indigo) !important;
     font-size: 13px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.5px !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-bottom: 1px solid var(--border-color) !important;
   }
 
   td.mat-mdc-cell {
-    color: #f1f5f9 !important;
+    color: var(--text-primary) !important;
     font-size: 14px !important;
     font-weight: 500 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+    border-bottom: 1px solid var(--border-color) !important;
   }
 
   .mat-mdc-header-row {
-    background: rgba(15, 23, 42, 0.7) !important;
+    background: var(--table-header-bg) !important;
   }
 
   .mat-mdc-row {
     transition: background 0.15s ease;
     &:hover {
-      background: rgba(56, 189, 248, 0.08) !important;
+      background: var(--table-row-hover) !important;
     }
   }
 
@@ -269,6 +300,17 @@ html[data-theme='dark'] .mat-mdc-form-field,
     caret-color: #38bdf8 !important;
     font-size: 14px !important;
     font-weight: 500 !important;
+
+    &::selection {
+      background: #38bdf8 !important;
+      color: #07111f !important;
+      -webkit-text-fill-color: #07111f !important;
+    }
+
+    &:-webkit-autofill {
+      -webkit-text-fill-color: #f8fafc !important;
+      box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.6) inset !important;
+    }
   }
 
   input.mat-mdc-input-element::placeholder,

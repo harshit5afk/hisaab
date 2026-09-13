@@ -33,7 +33,7 @@ interface NavItem {
       <aside class="sidebar" [class.collapsed]="sidebarCollapsed()">
         <div class="sidebar-header">
           <div class="logo" (click)="toggleSidebar()">
-            <span class="logo-icon">₹</span>
+            <img class="logo-icon" src="ion-shift-logo.png" alt="Ion Shift Engineering logo" />
             @if (!sidebarCollapsed()) {
               <span class="logo-text">Ion Shift Engineering</span>
             }
@@ -74,6 +74,16 @@ interface NavItem {
           </button>
 
           <div class="spacer"></div>
+
+          <button
+            mat-icon-button
+            class="theme-toggle"
+            (click)="toggleTheme()"
+            [attr.aria-label]="isDarkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
+            [matTooltip]="isDarkMode() ? 'Light mode' : 'Dark mode'"
+          >
+            <mat-icon>{{ isDarkMode() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+          </button>
 
           <div class="user-info">
             <mat-icon>account_circle</mat-icon>
@@ -129,11 +139,8 @@ interface NavItem {
       justify-content: center;
       width: 38px;
       height: 38px;
-      background: linear-gradient(135deg, #60a5fa 0%, #8b5cf6 100%);
+      object-fit: cover;
       border-radius: 12px;
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: white;
       flex-shrink: 0;
       box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35);
     }
@@ -152,6 +159,11 @@ interface NavItem {
       flex-direction: column;
       gap: 4px;
       overflow-y: auto;
+    }
+
+    .theme-toggle {
+      color: var(--text-secondary);
+      margin-right: 8px;
     }
 
     .nav-item {
@@ -270,6 +282,7 @@ interface NavItem {
 })
 export class Shell {
   sidebarCollapsed = signal(false);
+  isDarkMode = signal(true);
 
   navItems: NavItem[] = [
     { icon: 'dashboard', label: 'Dashboard', route: '/dashboard' },
@@ -284,11 +297,23 @@ export class Shell {
   ];
 
   constructor(public authService: AuthService) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    localStorage.setItem('hisaab-theme', 'dark');
+    const savedTheme = localStorage.getItem('hisaab-theme');
+    this.isDarkMode.set(savedTheme !== 'light');
+    this.applyTheme();
   }
 
   toggleSidebar() {
     this.sidebarCollapsed.update((v) => !v);
+  }
+
+  toggleTheme() {
+    this.isDarkMode.update((isDark) => !isDark);
+    this.applyTheme();
+  }
+
+  private applyTheme() {
+    const theme = this.isDarkMode() ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('hisaab-theme', theme);
   }
 }

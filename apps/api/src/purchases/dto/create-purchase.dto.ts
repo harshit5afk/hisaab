@@ -40,5 +40,9 @@ export class CreatePurchaseDto {
 
   @IsOptional()
   @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
   description?: string;
 }
