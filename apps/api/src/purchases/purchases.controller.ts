@@ -12,7 +12,7 @@ import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-
+import { Roles } from '../common/decorators/roles.decorator';
 import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
 
 @Controller('purchases')
@@ -36,6 +36,7 @@ export class PurchasesController {
   }
 
   @Post('bulk-delete')
+  @Roles('OWNER')
   bulkDelete(@Body() dto: BulkDeleteDto) {
     return this.purchasesService.removeMany(dto.ids);
   }
@@ -59,6 +60,7 @@ export class PurchasesController {
   }
 
   @Delete(':id')
+  @Roles('OWNER')
   remove(@Param('id') id: string) {
     return this.purchasesService.remove(id);
   }

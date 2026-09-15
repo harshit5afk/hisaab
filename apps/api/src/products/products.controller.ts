@@ -11,7 +11,7 @@ import {
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-
+import { Roles } from '../common/decorators/roles.decorator';
 import { BulkDeleteDto } from '../common/dto/bulk-delete.dto';
 
 @Controller('products')
@@ -32,6 +32,7 @@ export class ProductsController {
   }
 
   @Post('bulk-delete')
+  @Roles('OWNER')
   bulkDelete(@Body() dto: BulkDeleteDto) {
     return this.productsService.removeMany(dto.ids);
   }
@@ -52,6 +53,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @Roles('OWNER')
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }

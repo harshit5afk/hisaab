@@ -58,18 +58,15 @@ export class SalesService {
   }
 
   private async resolveUserId(userId?: string): Promise<string> {
-    if (userId) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true },
-      });
-      if (user) return user.id;
+    if (!userId) {
+      throw new UnauthorizedException('Authenticated user is required to create a customer');
     }
-    const defaultUser = await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
       select: { id: true },
     });
-    if (defaultUser) return defaultUser.id;
-    throw new UnauthorizedException('No active user account found to associate with customer');
+    if (!user) throw new UnauthorizedException('Authenticated user was not found');
+    return user.id;
   }
 
   async create(dto: CreateInvoiceDto, userId?: string) {
@@ -138,11 +135,29 @@ export class SalesService {
           }
         }
 
-        // ✅ REDUCE STOCK for sold product
+        // ✅ Verify stock availability and reduce stock for sold product
         if (resolvedProductId && qty > 0) {
-          await tx.product.update({
+          const product = await tx.product.findUnique({ where: { id: resolvedProductId } });
+          if (product && product.stock < qty) {
+            throw new BadRequestException(
+              `Insufficient stock for product "${product.name}". Available stock is ${product.stock}, but requested quantity is ${qty}.`,
+            );
+          }
+
+          const updatedProd = await tx.product.update({
             where: { id: resolvedProductId },
             data: { stock: { decrement: qty } },
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              productId: resolvedProductId,
+              type: 'SALE',
+              quantity: -qty,
+              balanceAfter: updatedProd.stock,
+              referenceId: invoiceNo,
+              note: `Sale on invoice ${invoiceNo} to ${customer.name}`,
+            },
           });
         }
 
@@ -242,10 +257,21 @@ export class SalesService {
           for (const oldItem of invoice.items as any[]) {
             const oldQty = Number(oldItem.qty) || 0;
             if (oldQty > 0 && oldItem.productId) {
-              await tx.product.update({
+              const reverted = await tx.product.update({
                 where: { id: oldItem.productId },
                 data: { stock: { increment: oldQty } },
-              }).catch(() => {});
+              });
+
+              await tx.stockMovement.create({
+                data: {
+                  productId: oldItem.productId,
+                  type: 'SALE_UPDATE',
+                  quantity: oldQty,
+                  balanceAfter: reverted.stock,
+                  referenceId: invoice.invoiceNo,
+                  note: `Invoice ${invoice.invoiceNo} edit (reverted previous item)`,
+                },
+              });
             }
           }
         }
@@ -255,7 +281,7 @@ export class SalesService {
           select: { id: true, name: true },
         });
 
-        // 2. Apply new stock deduction for new items
+        // 2. Apply new stock deduction for new items with availability check
         sanitizedItems = [];
         for (const i of dto.items) {
           const qty = Number(i.qty);
@@ -271,9 +297,27 @@ export class SalesService {
           }
 
           if (resolvedProductId && qty > 0) {
-            await tx.product.update({
+            const product = await tx.product.findUnique({ where: { id: resolvedProductId } });
+            if (product && product.stock < qty) {
+              throw new BadRequestException(
+                `Insufficient stock for product "${product.name}". Available stock is ${product.stock}, but requested quantity is ${qty}.`,
+              );
+            }
+
+            const updatedProd = await tx.product.update({
               where: { id: resolvedProductId },
               data: { stock: { decrement: qty } },
+            });
+
+            await tx.stockMovement.create({
+              data: {
+                productId: resolvedProductId,
+                type: 'SALE_UPDATE',
+                quantity: -qty,
+                balanceAfter: updatedProd.stock,
+                referenceId: invoice.invoiceNo,
+                note: `Invoice ${invoice.invoiceNo} edit (deducted updated item)`,
+              },
             });
           }
 
@@ -348,15 +392,26 @@ export class SalesService {
     const invoice = await this.findOne(id);
 
     return this.prisma.$transaction(async (tx) => {
-      // ✅ Revert stock for all items
+      // ✅ Revert stock for all items and log stock movements
       if (Array.isArray(invoice.items)) {
         for (const item of invoice.items as any[]) {
           const qty = Number(item.qty) || 0;
           if (qty > 0 && item.productId) {
-            await tx.product.update({
+            const reverted = await tx.product.update({
               where: { id: item.productId },
               data: { stock: { increment: qty } },
-            }).catch(() => {});
+            });
+
+            await tx.stockMovement.create({
+              data: {
+                productId: item.productId,
+                type: 'SALE_CANCEL',
+                quantity: qty,
+                balanceAfter: reverted.stock,
+                referenceId: invoice.invoiceNo,
+                note: `Invoice ${invoice.invoiceNo} cancelled / deleted`,
+              },
+            });
           }
         }
       }
@@ -381,10 +436,21 @@ export class SalesService {
           for (const item of inv.items as any[]) {
             const qty = Number(item.qty) || 0;
             if (qty > 0 && item.productId) {
-              await tx.product.update({
+              const reverted = await tx.product.update({
                 where: { id: item.productId },
                 data: { stock: { increment: qty } },
-              }).catch(() => {});
+              });
+
+              await tx.stockMovement.create({
+                data: {
+                  productId: item.productId,
+                  type: 'SALE_CANCEL',
+                  quantity: qty,
+                  balanceAfter: reverted.stock,
+                  referenceId: inv.invoiceNo,
+                  note: `Invoice ${inv.invoiceNo} bulk cancelled / deleted`,
+                },
+              });
             }
           }
         }

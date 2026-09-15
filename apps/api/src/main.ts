@@ -17,14 +17,18 @@ async function bootstrap() {
     }),
   );
 
-  // CORS: only needed in dev mode (Angular dev server on :4200)
-  // In production, frontend is served from same NestJS server — no CORS needed
-  if (process.env.NODE_ENV !== 'production') {
-    app.enableCors({
-      origin: ['http://localhost:4200'],
-      credentials: true,
-    });
-  }
+  // CORS: Allow localhost/127.0.0.1 on all ports for development & unified mode
+  app.enableCors({
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
   // SPA fallback: any GET request that doesn't match /api serves Angular index.html
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use((req: any, res: any, next: any) => {

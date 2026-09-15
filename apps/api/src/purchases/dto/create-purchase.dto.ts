@@ -31,12 +31,8 @@ export class CreatePurchaseDto {
 
   @IsOptional()
   @IsInt()
-  @Min(0)
+  @Min(1)
   rate?: number; // purchase unit rate in paise
-
-  @IsOptional()
-  @IsString()
-  unit?: string;
 
   @IsOptional()
   @IsString()

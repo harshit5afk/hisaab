@@ -9,7 +9,8 @@ import { AiApiService } from '../../core/api/ai-api.service';
 
 @Component({
   standalone: true,
-  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [FormsModule,
+    MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
   template: `
     <div class="page-header"><h1>AI Query</h1></div>
 
@@ -79,7 +80,7 @@ export default class AiQuery {
   loading = signal(false);
   history = signal<Array<{ question: string; answer: string }>>([]);
 
-  constructor(private aiApi: AiApiService) {}
+  constructor(private aiApi: AiApiService) { }
 
   ask() {
     if (!this.question.trim() || this.loading()) return;
@@ -94,9 +95,8 @@ export default class AiQuery {
         this.loading.set(false);
         this.question = '';
       },
-      error: (err) => {
-        const message = err.error?.message || 'AI service is unavailable. Please try again.';
-        this.answer.set(message);
+      error: () => {
+        this.answer.set('Sorry, I could not process that query. Please try again.');
         this.loading.set(false);
       },
     });

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('payments')
 export class PaymentsController {
@@ -40,6 +41,7 @@ export class PaymentsController {
   }
 
   @Delete(':id')
+  @Roles('OWNER')
   remove(@Param('id') id: string) {
     return this.paymentsService.remove(id);
   }

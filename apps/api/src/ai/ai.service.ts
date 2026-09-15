@@ -49,8 +49,9 @@ export class AiService {
   ): Promise<ExtractedInvoice> {
     const client = this.ensureClient();
 
+    const model = this.config.get<string>('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-20241022';
     const response = await client.messages.create({
-      model: 'claude-sonnet-5',
+      model,
       max_tokens: 1024,
       messages: [
         {
@@ -146,8 +147,9 @@ Set confidence to "low" if the image is blurry or partially visible.`,
 
     const dataUsed = JSON.stringify(context, null, 2);
 
+    const model = this.config.get<string>('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-20241022';
     const response = await client.messages.create({
-      model: 'claude-sonnet-5',
+      model,
       max_tokens: 512,
       system: `You are a helpful accounting assistant for an Indian business called Ion Shift Engineering.
 You have access to the following customer summary data (amounts in ₹):

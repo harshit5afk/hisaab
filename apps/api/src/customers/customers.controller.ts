@@ -12,6 +12,7 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('customers')
 export class CustomersController {
@@ -49,6 +50,7 @@ export class CustomersController {
   }
 
   @Delete(':id')
+  @Roles('OWNER')
   remove(@Param('id') id: string) {
     return this.customersService.remove(id);
   }

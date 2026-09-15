@@ -108,12 +108,14 @@ interface NavItem {
     .sidebar {
       width: 260px;
       background: linear-gradient(180deg, var(--sidebar-start), var(--sidebar-end));
-      border-right: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border-right: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
       transition: width var(--transition-normal);
       z-index: 100;
-      box-shadow: 20px 0 40px rgba(19, 31, 73, 0.12);
+      box-shadow: 10px 0 32px rgba(0, 0, 0, 0.4);
 
       &.collapsed {
         width: 72px;
@@ -122,7 +124,7 @@ interface NavItem {
 
     .sidebar-header {
       padding: 20px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid var(--border-color);
     }
 
     .logo {
@@ -143,6 +145,12 @@ interface NavItem {
       border-radius: 12px;
       flex-shrink: 0;
       box-shadow: 0 8px 18px rgba(99, 102, 241, 0.35);
+      transition: transform var(--transition-spring), box-shadow var(--transition-fast);
+
+      &:hover {
+        transform: scale(1.08);
+        box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+      }
     }
 
     .logo-text {
@@ -164,13 +172,19 @@ interface NavItem {
     .theme-toggle {
       color: var(--text-secondary);
       margin-right: 8px;
+      transition: transform var(--transition-spring), color var(--transition-fast);
+
+      &:hover {
+        color: #38bdf8;
+        transform: rotate(20deg) scale(1.1);
+      }
     }
 
     .nav-item {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 11px 12px;
+      padding: 11px 14px;
       border-radius: 12px;
       color: var(--sidebar-text);
       text-decoration: none;
@@ -183,20 +197,29 @@ interface NavItem {
         font-size: 22px;
         width: 22px;
         height: 22px;
+        transition: transform var(--transition-fast), color var(--transition-fast);
       }
 
       &:hover {
         background: var(--sidebar-hover);
         color: #ffffff;
+        transform: translateX(3px);
+
+        mat-icon {
+          color: #38bdf8;
+          transform: scale(1.1);
+        }
       }
 
       &.active {
         background: var(--sidebar-active);
         color: #f8fbff;
-        box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.22);
+        border: 1px solid rgba(56, 189, 248, 0.4);
+        box-shadow: 0 0 20px -2px rgba(56, 189, 248, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
 
         mat-icon {
-          color: #8ad6ff;
+          color: #38bdf8;
+          filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
         }
       }
     }
@@ -208,7 +231,7 @@ interface NavItem {
 
     .sidebar-footer {
       padding: 8px 10px 12px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid var(--border-color);
     }
 
     .main-content {
@@ -226,7 +249,9 @@ interface NavItem {
       height: 72px;
       border-bottom: 1px solid var(--border-color);
       background: var(--topbar-bg);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
       flex-shrink: 0;
       gap: 12px;
     }
@@ -239,11 +264,20 @@ interface NavItem {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
+      padding: 8px 14px;
       border-radius: 999px;
-      background: rgba(79, 110, 247, 0.06);
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       color: var(--text-secondary);
       border: 1px solid var(--border-color);
+      transition: all var(--transition-fast);
+
+      &:hover {
+        border-color: rgba(56, 189, 248, 0.45);
+        box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+        transform: translateY(-1px);
+      }
 
       .user-name {
         font-size: 0.9rem;

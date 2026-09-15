@@ -136,10 +136,28 @@ model Product {
   deletedAt DateTime?
 
   purchases Purchase[] @relation("PurchaseProduct")
+  stockMovements StockMovement[]
 
   @@index([name])
   @@index([deletedAt])
   @@map("products")
+}
+
+model StockMovement {
+  id           String   @id @default(uuid())
+  productId    String
+  type         String   // PURCHASE, PURCHASE_CANCEL, PURCHASE_UPDATE, SALE, SALE_CANCEL, ADJUSTMENT
+  quantity     Float    // positive (inflow) or negative (outflow)
+  balanceAfter Float
+  referenceId  String?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([createdAt])
+  @@map("stock_movements")
 }
 
 /// Atomic sequence for invoice number generation — avoids race conditions
