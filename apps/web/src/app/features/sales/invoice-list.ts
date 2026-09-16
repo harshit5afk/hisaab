@@ -168,6 +168,15 @@ import { SalesApiService } from '../../core/api/sales-api.service';
 
             <div class="header-right-actions">
               <button
+                mat-stroked-button
+                class="tab-btn"
+                (click)="openInNewTab(previewInvoice()!.id)"
+                matTooltip="Open in new browser tab"
+              >
+                <mat-icon>open_in_new</mat-icon>
+                <span>Open in Tab</span>
+              </button>
+              <button
                 mat-flat-button
                 color="primary"
                 class="download-btn"
@@ -215,6 +224,12 @@ import { SalesApiService } from '../../core/api/sales-api.service';
             </div>
             <div class="footer-actions">
               <button mat-button (click)="closePreview()">Close</button>
+              <button
+                mat-stroked-button
+                (click)="openInNewTab(previewInvoice()!.id)"
+              >
+                <mat-icon>open_in_new</mat-icon> Open in Tab
+              </button>
               <button
                 mat-flat-button
                 color="primary"
@@ -664,16 +679,38 @@ export default class InvoiceList implements OnInit, OnDestroy {
     this.isPdfLoading.set(true);
     this.cleanupPdfBlob();
 
-    this.api.downloadInvoicePdf(invoice.id).subscribe({
+    this.api.downloadInvoicePdf(invoice.id, 'inline').subscribe({
       next: (blob) => {
-        this.cachedBlob = blob;
-        this.currentBlobRawUrl = window.URL.createObjectURL(blob);
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        this.cachedBlob = pdfBlob;
+        this.currentBlobRawUrl = window.URL.createObjectURL(pdfBlob);
         this.pdfBlobUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(this.currentBlobRawUrl));
         this.isPdfLoading.set(false);
       },
       error: (err) => {
         console.error('PDF preview error:', err);
         this.isPdfLoading.set(false);
+      },
+    });
+  }
+
+  openInNewTab(id: string) {
+    if (this.cachedBlob && this.previewInvoice()?.id === id) {
+      const url = window.URL.createObjectURL(this.cachedBlob);
+      window.open(url, '_blank');
+      return;
+    }
+
+    this.snackBar.open('Preparing invoice PDF...', '', { duration: 1500 });
+    this.api.downloadInvoicePdf(id, 'inline').subscribe({
+      next: (blob) => {
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(pdfBlob);
+        window.open(url, '_blank');
+      },
+      error: (err) => {
+        console.error('Open PDF error:', err);
+        this.snackBar.open('Could not load invoice PDF', 'OK', { duration: 3000 });
       },
     });
   }
@@ -695,7 +732,8 @@ export default class InvoiceList implements OnInit, OnDestroy {
   // ─── Download Logic ───
   downloadInvoice(id: string) {
     const inv = this.invoices().find((i: any) => i.id === id) || this.previewInvoice();
-    const safeName = inv?.invoiceNo ? inv.invoiceNo.replace(/[/\\?%*:|"<>]/g, '-') : `invoice-${id.slice(0, 8)}`;
+    const rawName = inv?.invoiceNo ? inv.invoiceNo.replace(/[/\?%*:|"<>]/g, '-') : 'invoice-' + id.slice(0, 8);
+    const safeName = rawName.toLowerCase().endsWith('.pdf') ? rawName.slice(0, -4) : rawName;
 
     // Instant download if blob is already cached from the preview modal!
     if (this.previewInvoice()?.id === id && this.cachedBlob) {
@@ -705,7 +743,7 @@ export default class InvoiceList implements OnInit, OnDestroy {
 
     this.isPdfDownloading.set(true);
     this.snackBar.open('Generating PDF...', '', { duration: 1500 });
-    this.api.downloadInvoicePdf(id).subscribe({
+    this.api.downloadInvoicePdf(id, 'attachment').subscribe({
       next: (blob) => {
         this.isPdfDownloading.set(false);
         this.triggerBlobDownload(blob, safeName);
@@ -719,11 +757,12 @@ export default class InvoiceList implements OnInit, OnDestroy {
   }
 
   private triggerBlobDownload(blob: Blob, filename: string) {
-    const url = window.URL.createObjectURL(blob);
+    const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
     a.style.display = 'none';
     a.href = url;
-    a.download = `${filename}.pdf`;
+    a.download = filename + '.pdf';
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {

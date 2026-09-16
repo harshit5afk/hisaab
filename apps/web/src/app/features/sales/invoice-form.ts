@@ -1237,7 +1237,15 @@ export interface InvoiceLineItem {
     .cancel-btn {
       color: #94a3b8;
     }
-    .submit-btn {
+    .save-download-btn {
+        border-color: rgba(56, 189, 248, 0.5) !important;
+        color: #38bdf8 !important;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .submit-btn {
       background: #0284c7 !important;
       color: #ffffff !important;
       padding: 0 24px;
@@ -1674,7 +1682,7 @@ export default class InvoiceForm implements OnInit {
     );
   }
 
-  save() {
+  save(downloadPdf: boolean = false) {
     if (this.form.invalid || this.isSubmitting() || !this.isItemsValid()) return;
 
     this.isSubmitting.set(true);
@@ -1721,9 +1729,35 @@ export default class InvoiceForm implements OnInit {
     }
 
     this.salesApi.create(payload).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.isSubmitting.set(false);
         this.snackBar.open('Invoice created successfully! Product stock reduced.', 'OK', { duration: 3500 });
+
+        const createdId = res?.id || res?.data?.id;
+        if (downloadPdf && createdId) {
+          const invNo = res?.invoiceNo || res?.data?.invoiceNo || 'invoice';
+          const safeName = invNo.replace(/[/\?%*:|"<>]/g, '-');
+          this.salesApi.downloadInvoicePdf(createdId, 'attachment').subscribe({
+            next: (blob) => {
+              const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+              const url = window.URL.createObjectURL(pdfBlob);
+              const a = document.createElement('a');
+              a.style.display = 'none';
+              a.href = url;
+              a.download = safeName.endsWith('.pdf') ? safeName : safeName + '.pdf';
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+              }, 1000);
+            },
+            error: (err) => {
+              console.error('Auto download invoice error:', err);
+            },
+          });
+        }
+
         this.router.navigate(['/sales']);
       },
       error: (err) => {

@@ -26,8 +26,9 @@ export class SalesApiService extends ApiService {
     return this.http.delete(`${this.apiUrl}/sales/${id}`);
   }
 
-  downloadInvoicePdf(id: string): Observable<Blob> {
+  downloadInvoicePdf(id: string, disposition: string = 'inline'): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/sales/${id}/invoice/pdf`, {
+      params: { disposition },
       responseType: 'blob',
     });
   }
@@ -36,4 +37,3 @@ export class SalesApiService extends ApiService {
     return this.http.post(`${this.apiUrl}/sales/bulk-delete`, { ids });
   }
 }
-

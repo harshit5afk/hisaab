@@ -1,14 +1,47 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy, Logger } from '@nestjs/common';
 import * as puppeteer from 'puppeteer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
-export class InvoicePdfService {
-  async generatePdf(invoice: any, customer: any): Promise<Uint8Array> {
-    if (!invoice) throw new NotFoundException('Invoice not found');
-    if (!customer) throw new NotFoundException('Customer not found');
+export class InvoicePdfService implements OnModuleDestroy {
+  private readonly logger = new Logger(InvoicePdfService.name);
+  private browserInstance: puppeteer.Browser | null = null;
+  private templateFn: handlebars.TemplateDelegate | null = null;
+
+  async onModuleDestroy() {
+    if (this.browserInstance) {
+      try {
+        await this.browserInstance.close();
+      } catch {
+        // ignore on shutdown
+      }
+      this.browserInstance = null;
+    }
+  }
+
+  private async getBrowser(): Promise<puppeteer.Browser> {
+    if (this.browserInstance && this.browserInstance.connected) {
+      return this.browserInstance;
+    }
+    this.logger.log('Launching reusable Chromium instance for invoice PDF rendering...');
+    this.browserInstance = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--no-first-run',
+        '--no-zygote',
+      ],
+    });
+    return this.browserInstance;
+  }
+
+  private getTemplate(): handlebars.TemplateDelegate {
+    if (this.templateFn) return this.templateFn;
 
     const possiblePaths = [
       path.join(__dirname, '..', 'templates', 'invoice.hbs'),
@@ -23,7 +56,14 @@ export class InvoicePdfService {
       throw new Error(`Invoice template invoice.hbs not found in: ${possiblePaths.join(', ')}`);
     }
     const templateHtml = fs.readFileSync(templatePath, 'utf-8');
-    const template = handlebars.compile(templateHtml);
+    this.templateFn = handlebars.compile(templateHtml);
+    return this.templateFn;
+  }
+
+  async generatePdf(invoice: any, customer: any): Promise<Uint8Array> {
+    if (!invoice) throw new NotFoundException('Invoice not found');
+
+    const template = this.getTemplate();
 
     // Amounts in rupees
     const subtotalInRupees = (invoice.amount || 0) / 100;
@@ -77,7 +117,8 @@ export class InvoicePdfService {
 
     const isGstInvoice = Boolean(invoice.isGstInvoice);
     const taxRate = invoice.taxRate ?? 18;
-    const customerState = customer.state || this.extractState(customer.address);
+    const cust = customer || {};
+    const customerState = cust.state || this.extractState(cust.address);
 
     const html = template({
       businessName: process.env.BUSINESS_NAME || 'Ion Shift Engineering',
@@ -97,12 +138,12 @@ export class InvoicePdfService {
         month: 'short',
         year: 'numeric',
       }),
-      customerName: customer.name,
-      customerAddress: customer.address || '—',
-      customerPhone: customer.phone || '—',
-      customerGstin: customer.gstin || '—',
-      customerState,
-      description: invoice.description || '—',
+      customerName: cust.name || 'Valued Customer',
+      customerAddress: cust.address || '-',
+      customerPhone: cust.phone || '-',
+      customerGstin: cust.gstin || '-',
+      customerState: customerState || '-',
+      description: invoice.description || '-',
       subtotalAmount: formatInr(subtotalInRupees),
       cgstAmount: formatInr(cgstInRupees),
       sgstAmount: formatInr(sgstInRupees),
@@ -115,26 +156,25 @@ export class InvoicePdfService {
       amountInWords: this.numberToWords(grandTotalInRupees),
     });
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-    });
+    const browser = await this.getBrowser();
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'domcontentloaded' });
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
-    await browser.close();
-
-    return pdfBuffer;
+    try {
+      await page.setContent(html, { waitUntil: 'domcontentloaded' });
+      const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+      return pdfBuffer;
+    } finally {
+      await page.close();
+    }
   }
 
-  /** Extract state/city from address string, e.g. "MG Road, Pune" → "Pune" */
+  /** Extract state/city from address string, e.g. "MG Road, Pune" -> "Pune" */
   private extractState(address?: string): string {
-    if (!address) return '—';
+    if (!address) return '-';
     const parts = address.split(',');
     return parts.length > 1 ? parts[parts.length - 1].trim() : parts[0].trim();
   }
 
-  /** Convert a number to Indian English words, e.g. 45000 → "FORTY FIVE THOUSAND RUPEES ONLY" */
+  /** Convert a number to Indian English words, e.g. 45000 -> "FORTY FIVE THOUSAND RUPEES ONLY" */
   private numberToWords(num: number): string {
     if (num === 0) return 'ZERO RUPEES ONLY';
 

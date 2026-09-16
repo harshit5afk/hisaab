@@ -50,24 +50,48 @@ export class SalesController {
   }
 
   @Get(':id/invoice/pdf')
-  async downloadInvoice(@Param('id') id: string, @Res() res: Response) {
+  async downloadInvoice(
+    @Param('id') id: string,
+    @Query('disposition') disposition: string = 'inline',
+    @Res() res: Response,
+  ) {
     const invoice = await this.prisma.invoice.findFirst({
       where: { id, deletedAt: null },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
 
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: invoice.customerId },
-    });
+    let customer = null;
+    if (invoice.customerId) {
+      customer = await this.prisma.customer.findUnique({
+        where: { id: invoice.customerId },
+      });
+    }
+
+    if (!customer) {
+      customer = {
+        name: (invoice as any).customerName || 'Valued Customer',
+        phone: (invoice as any).customerPhone || '-',
+        address: (invoice as any).customerAddress || '-',
+        gstin: (invoice as any).customerGstin || '-',
+        state: (invoice as any).customerState || 'RAJASTHAN',
+      };
+    }
 
     const pdfBuffer = await this.invoicePdfService.generatePdf(invoice, customer);
+    const buf = Buffer.from(pdfBuffer);
 
     const safeInvoiceNo = (invoice.invoiceNo || 'invoice').replace(/[/\\?%*:|"<>]/g, '-');
-    res.set({
+    const headerDisposition = disposition === 'attachment' ? 'attachment' : 'inline';
+
+    res.writeHead(200, {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${safeInvoiceNo}.pdf"`,
+      'Content-Disposition': `${headerDisposition}; filename="${safeInvoiceNo}.pdf"`,
+      'Content-Length': buf.length,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     });
-    res.send(pdfBuffer);
+    res.end(buf);
   }
 
   @Post()
@@ -95,4 +119,3 @@ export class SalesController {
     return this.salesService.remove(id);
   }
 }
-
