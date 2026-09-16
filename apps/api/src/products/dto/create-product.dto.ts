@@ -16,4 +16,9 @@ export class CreateProductDto {
   @IsInt()
   @Min(0)
   rate: number; // in paise
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  stock?: number;
 }

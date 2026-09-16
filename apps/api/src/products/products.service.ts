@@ -76,6 +76,7 @@ export class ProductsService {
         hsn: dto.hsn?.trim() || null,
         unit: dto.unit?.trim() || 'NOS',
         rate: dto.rate,
+        stock: dto.stock ?? 0,
       },
     });
   }
