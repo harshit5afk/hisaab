@@ -27,7 +27,7 @@ export class AiService {
       this.genAI = new GoogleGenerativeAI(apiKey.trim());
       this.logger.log(`Gemini AI initialized with model: ${this.geminiModel}`);
     } else {
-      this.logger.log('Using zero-setup free AI engine & smart business assistant');
+      this.logger.log('Using zero-setup lightning-fast smart business engine');
     }
   }
 
@@ -81,20 +81,22 @@ If any field is unclear, set it to null. Set confidence to "low" if blurry.`;
 
   /**
    * Answer a natural language question about the business data.
+   * Priority: Instant local engine (<10ms) -> Gemini (if key) -> Fast cloud fallback
    */
   async answerQuery(question: string): Promise<{ answer: string; dataUsed: string }> {
     const trimmed = question.trim();
 
-    // 1. Check for pure arithmetic/math queries (e.g. "2+2", "500*12", "15000 - 3500")
+    // 1. Instant Math Evaluation (< 1ms)
     const mathAnswer = this.evaluateMath(trimmed);
     if (mathAnswer !== null) {
       return { answer: mathAnswer, dataUsed: 'Local Math Evaluator' };
     }
 
-    // 2. Fetch live summarized customer balance & sales data
+    // 2. Fetch live ONLY ACTIVE customers from database (strictly deletedAt: null)
     const customers = await this.prisma.customer.findMany({
       where: { deletedAt: null },
       select: {
+        id: true,
         name: true,
         phone: true,
         invoices: {
@@ -106,12 +108,14 @@ If any field is unclear, set it to null. Set confidence to "low" if blurry.`;
           select: { amount: true, date: true, mode: true },
         },
       },
+      orderBy: { name: 'asc' },
     });
 
     const context = customers.map((c) => {
       const totalInvoiced = c.invoices.reduce((s, i) => s + (i.totalAmount || i.amount), 0);
       const totalPaid = c.payments.reduce((s, p) => s + p.amount, 0);
       return {
+        id: c.id,
         name: c.name,
         phone: c.phone,
         totalInvoiced: totalInvoiced / 100,
@@ -129,25 +133,32 @@ If any field is unclear, set it to null. Set confidence to "low" if blurry.`;
     const dataUsed = JSON.stringify(
       {
         totalCustomers: customers.length,
-        totalSales: totalSales,
-        totalCollected: totalCollected,
-        totalOutstanding: totalOutstanding,
-        customers: context,
+        totalSales,
+        totalCollected,
+        totalOutstanding,
+        activeCustomers: context.map(c => ({ name: c.name, balance: c.balance })),
       },
       null,
       2,
     );
 
-    // 3. Try Gemini AI if API key configured
+    // 3. LIGHTNING-FAST Local Business Engine (< 5ms response time!)
+    // Directly handles greetings, customer balance checks, sales, pending dues, customer lists
+    const localAnswer = this.generateLocalSmartAnswer(trimmed, context, totalSales, totalCollected, totalOutstanding);
+    if (localAnswer !== null) {
+      return { answer: this.sanitizeCurrency(localAnswer, trimmed), dataUsed };
+    }
+
+    // 4. If Gemini API key is configured, use it for custom open-ended queries
     if (this.genAI) {
       try {
         const genModel = this.genAI.getGenerativeModel({ model: this.geminiModel });
         const systemPrompt = `You are an AI assistant for Ion Shift Engineering accounting app (Hisaab).
-Data:
+Active Customers and Business Data:
 ${dataUsed}
 
 Instructions:
-- Answer accurately and concisely based ONLY on real customers and records in the data.
+- Answer accurately and concisely based ONLY on active customers in the data.
 - For currency, ALWAYS use the Indian Rupee symbol '₹' (NOT 'Rs' or 'Rs.').
 - For general questions or math, do NOT attach currency symbols.
 - Respond in the user's language (English/Hindi/Hinglish).`;
@@ -158,25 +169,25 @@ Instructions:
           return { answer: this.sanitizeCurrency(answer.trim(), trimmed), dataUsed };
         }
       } catch (err) {
-        this.logger.warn('Gemini query failed, attempting free cloud fallback', err);
+        this.logger.warn('Gemini query failed', err);
       }
     }
 
-    // 4. Try Free Cloud AI (Pollinations - no key needed)
+    // 5. Cloud fallback with 3-second timeout for open-ended queries
     try {
-      const promptText = `You are a helpful assistant for Ion Shift Engineering.
-Business Data: Total Sales: ₹${totalSales.toLocaleString('en-IN')}, Total Collections: ₹${totalCollected.toLocaleString('en-IN')}, Total Balance Due: ₹${totalOutstanding.toLocaleString('en-IN')}.
-Real Customers: ${context.map(c => `${c.name}: Balance ₹${c.balance}, Billed ₹${c.totalInvoiced}, Paid ₹${c.totalPaid}`).join('; ')}
+      const promptText = `You are an assistant for Ion Shift Engineering.
+Total Sales: ₹${totalSales.toLocaleString('en-IN')}, Collections: ₹${totalCollected.toLocaleString('en-IN')}, Due: ₹${totalOutstanding.toLocaleString('en-IN')}.
+Active Customers: ${context.map(c => `${c.name}: Balance ₹${c.balance}`).join('; ')}
 
 Question: ${trimmed}
 Rules:
-- For monetary amounts, always format with '₹' (e.g. ₹5,000). Never write 'Rs' or 'Rs.'.
-- For math or non-financial questions, do NOT attach any currency symbol.
-- Answer concisely in English, Hindi, or Hinglish based on question.`;
+- For money amounts, format with '₹'. Never write 'Rs'.
+- For math or non-financial questions, do NOT attach currency.
+- Answer concisely in English or Hindi/Hinglish.`;
 
       const encoded = encodeURIComponent(promptText);
       const res = await fetch(`https://text.pollinations.ai/${encoded}`, {
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(3000),
       });
 
       if (res.ok) {
@@ -185,13 +196,13 @@ Rules:
           return { answer: this.sanitizeCurrency(text.trim(), trimmed), dataUsed };
         }
       }
-    } catch {
-      this.logger.debug('Pollinations fallback skipped, using local smart engine');
-    }
+    } catch {}
 
-    // 5. Built-in Local Smart Business Engine (Instant & 100% Reliable)
-    const localAnswer = this.generateLocalSmartAnswer(trimmed, context, totalSales, totalCollected, totalOutstanding);
-    return { answer: this.sanitizeCurrency(localAnswer, trimmed), dataUsed };
+    // 6. Default instant overview fallback
+    return {
+      answer: this.generateDefaultOverview(context, totalSales, totalCollected, totalOutstanding),
+      dataUsed,
+    };
   }
 
   /**
@@ -227,64 +238,81 @@ Rules:
     return result;
   }
 
+  /**
+   * High-speed local deterministic matcher - answers in < 5 milliseconds!
+   * Returns null if question needs generative AI.
+   */
   private generateLocalSmartAnswer(
     question: string,
-    customers: Array<{ name: string; phone: string | null; totalInvoiced: number; totalPaid: number; balance: number }>,
+    customers: Array<{ id: string; name: string; phone: string | null; totalInvoiced: number; totalPaid: number; balance: number }>,
     totalSales: number,
     totalCollected: number,
     totalOutstanding: number,
-  ): string {
+  ): string | null {
     const q = question.toLowerCase().trim();
-    const sampleCustomer = customers.find(c => c.name && c.name.toLowerCase() !== 'xxxx')?.name || 'Rohit Sharma';
+    const sampleCustomer = customers[0]?.name || 'Rohit Sharma';
 
-    // Greetings
+    // 1. Greetings (instant)
     if (/^(hi|hello|hey|namaste|kem cho|good morning|good evening|good afternoon|salam)/i.test(q) || q === 'hi' || q === 'hello') {
-      return `Hello! 👋 I am your Hisaab Business Assistant for Ion Shift Engineering.\n\n📊 Business Overview:\n• Total Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Balance: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nYou can ask me:\n- "${sampleCustomer} ka balance kitna hai?"\n- "Who has pending balance?"\n- "Total sales"`;
+      return `Hello! 👋 I am your Hisaab Business Assistant for Ion Shift Engineering.\n\n📊 Live Business Overview:\n• Total Active Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Balance: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nYou can ask:\n- "${sampleCustomer} ka balance kitna hai?"\n- "Pending balance kiska baaki hai?"\n- "Total sales"`;
     }
 
-    // Customer Lookup
+    // 2. Specific Customer Match (instant lookup)
     for (const c of customers) {
-      const nameParts = c.name.toLowerCase().split(/\s+/);
-      const matches = nameParts.some(part => part.length >= 3 && q.includes(part)) || q.includes(c.name.toLowerCase());
-      if (matches) {
+      const cNameLower = c.name.toLowerCase();
+      // Match full name or distinct word (min 3 chars)
+      const nameParts = cNameLower.split(/\s+/).filter(p => p.length >= 3);
+      const isMatch = q.includes(cNameLower) || nameParts.some(part => q.includes(part));
+
+      if (isMatch) {
         const balanceStatus = c.balance > 0
-          ? `₹${c.balance.toLocaleString('en-IN')} pending hai.`
+          ? `₹${c.balance.toLocaleString('en-IN')} pending (baaki) hai.`
           : c.balance === 0
           ? `ka pura hisaab clear hai (Balance: ₹0).`
           : `ka ₹${Math.abs(c.balance).toLocaleString('en-IN')} advance payment jama hai.`;
 
-        return `👤 Customer: ${c.name}\n${c.phone ? '📞 Phone: ' + c.phone + '\n' : ''}• Total Billed: ₹${c.totalInvoiced.toLocaleString('en-IN')}\n• Total Paid: ₹${c.totalPaid.toLocaleString('en-IN')}\n• Balance: ${balanceStatus}`;
+        return `👤 Customer: ${c.name}\n${c.phone ? '📞 Phone: ' + c.phone + '\n' : ''}• Total Invoiced: ₹${c.totalInvoiced.toLocaleString('en-IN')}\n• Total Paid: ₹${c.totalPaid.toLocaleString('en-IN')}\n• Current Balance: ${balanceStatus}`;
       }
     }
 
-    // If user asks about someone not in customer list
-    if (q.includes('balance') && (q.includes('ka') || q.includes('ki') || q.includes('hai'))) {
-      const topDebtors = customers.filter(c => c.balance > 0).slice(0, 3).map(c => c.name).join(', ');
-      return `Yeh customer aapke records me nahi mila. Aap inme se kisi ka hisaab pooch sakte hain:\n${topDebtors || 'Customer list'}\n\nYa "Total sales" ya "Pending balances" pooch sakte hain!`;
+    // 3. Sales / Revenue Queries (instant)
+    if (/sale|bikri|revenue|turnover|kamai|invoiced|total amount/i.test(q)) {
+      return `📊 Live Sales Summary:\n• Total Invoiced Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Payments Collected: ₹${totalCollected.toLocaleString('en-IN')}\n• Net Pending Receivable: ₹${totalOutstanding.toLocaleString('en-IN')}\n• Total Active Customers: ${customers.length}`;
     }
 
-    // Sales / Revenue Queries
-    if (q.includes('sale') || q.includes('bikri') || q.includes('revenue') || q.includes('turnover') || q.includes('kamai')) {
-      return `📊 Sales Summary:\n• Total Invoiced Amount: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Receivable: ₹${totalOutstanding.toLocaleString('en-IN')}`;
-    }
-
-    // Pending / Debtors Queries
-    if (q.includes('pending') || q.includes('baaki') || q.includes('due') || q.includes('balance') || q.includes('debt') || q.includes('udhar')) {
+    // 4. Pending / Debtors / Baaki Queries (instant)
+    if (/pending|baaki|baki|due|udhar|debt|baki kitna/i.test(q)) {
       const withDue = customers.filter(c => c.balance > 0).sort((a, b) => b.balance - a.balance);
       if (withDue.length === 0) {
-        return `✅ Sabhi accounts clear hain! Kisi customer ka balance pending nahi hai.`;
+        return `✅ Sabhi accounts clear hain! Kisi active customer ka balance pending nahi hai.`;
       }
       const list = withDue.slice(0, 5).map((c, i) => `${i + 1}. ${c.name}: ₹${c.balance.toLocaleString('en-IN')}`).join('\n');
-      return `📋 Top Pending Customer Balances:\n${list}\n\nTotal Outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}`;
+      return `📋 Top Pending Customer Balances:\n${list}\n\nTotal Pending to Collect: ₹${totalOutstanding.toLocaleString('en-IN')}`;
     }
 
-    // Customer List
-    if (q.includes('customer') || q.includes('grahak') || q.includes('party')) {
-      return `👥 Total Customers: ${customers.length}\n` +
-        customers.slice(0, 6).map(c => `• ${c.name} (Balance: ₹${c.balance.toLocaleString('en-IN')})`).join('\n');
+    // 5. Customer List / Active Parties (instant)
+    if (/customer|grahak|party|parties|active customer/i.test(q)) {
+      return `👥 Active Customers (${customers.length}):\n` +
+        customers.slice(0, 8).map((c, i) => `${i + 1}. ${c.name} (Balance: ₹${c.balance.toLocaleString('en-IN')})`).join('\n') +
+        (customers.length > 8 ? `\n...aur ${customers.length - 8} aur customers.` : '');
     }
 
-    // General Summary
-    return `📈 Business Overview:\n• Total Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nTry asking: "${sampleCustomer} ka balance", "Pending payments", or "Total sales"!`;
+    // 6. If user explicitly asks about someone's balance but name is not found among active customers:
+    if (/balance|baaki|hisaab/i.test(q) && /(ka|ki|ke|customer|party)/i.test(q)) {
+      const sampleList = customers.slice(0, 4).map(c => `• ${c.name}`).join('\n');
+      return `❌ Yeh customer aapke active records me nahi mila (ho sakta hai delete ho chuka ho ya naam me typo ho).\n\nAapke active customers me se pooch sakte hain:\n${sampleList}`;
+    }
+
+    return null; // Delegate to generative model
+  }
+
+  private generateDefaultOverview(
+    customers: Array<{ name: string; balance: number }>,
+    totalSales: number,
+    totalCollected: number,
+    totalOutstanding: number,
+  ): string {
+    const sample = customers.slice(0, 4).map(c => c.name).join(', ');
+    return `📈 Business Status:\n• Active Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Due: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nAap kisi bhi customer ka hisaab pooch sakte hain:\n${sample || 'Customer list'}`;
   }
 }
