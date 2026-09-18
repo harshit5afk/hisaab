@@ -5,7 +5,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AiApiService } from '../../core/api/ai-api.service';
+
+interface QueryHistoryItem {
+  question: string;
+  answer: string;
+  timestamp: string;
+}
 
 @Component({
   standalone: true,
@@ -16,77 +23,510 @@ import { AiApiService } from '../../core/api/ai-api.service';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
   ],
   template: `
-    <div class="page-header"><h1>AI Query</h1></div>
+    <div class="page-header">
+      <div>
+        <h1>AI Query Assistant</h1>
+        <p class="subtitle">Ask about your business sales, customer balances, or calculations in English or Hindi</p>
+      </div>
+    </div>
 
-    <div class="query-container">
-      <div class="card query-box">
-        <h3>Ask about your business</h3>
-        <p class="hint">Try: "hi", "Ramesh ka kitna balance baaki hai?" or "Total sales this month?"</p>
+    <div class="ai-layout">
+      <!-- Left Column: Main Query & Response Area -->
+      <div class="main-column">
+        <div class="card query-card">
+          <div class="card-header-bar">
+            <div class="header-left">
+              <mat-icon class="header-icon">smart_toy</mat-icon>
+              <h3>Ask about your business</h3>
+            </div>
+          </div>
+          <p class="hint">Ask in plain English or Hinglish (e.g. "Ramesh ka balance", "Total sales", "2+2")</p>
 
-        <div class="input-row">
-          <mat-form-field appearance="outline" class="query-input">
-            <mat-label>Type your question...</mat-label>
-            <input matInput [(ngModel)]="question" (keydown.enter)="ask()" />
-            <mat-icon matPrefix>smart_toy</mat-icon>
-          </mat-form-field>
-          @if (loading()) {
-            <button mat-flat-button color="primary" disabled>
-              <mat-spinner diameter="20" />
+          <div class="input-row">
+            <mat-form-field appearance="outline" class="query-input">
+              <mat-label>Type your question...</mat-label>
+              <input
+                matInput
+                [(ngModel)]="question"
+                (keydown.enter)="ask()"
+                placeholder="e.g. Ramesh ka kitna balance baaki hai?, 2+2, total sales"
+              />
+              <mat-icon matPrefix class="input-icon">chat</mat-icon>
+            </mat-form-field>
+
+            @if (loading()) {
+              <button mat-flat-button color="primary" class="ask-btn" disabled>
+                <mat-spinner diameter="20" />
+              </button>
+            } @else {
+              <button
+                mat-flat-button
+                color="primary"
+                class="ask-btn"
+                (click)="ask()"
+                [disabled]="!question.trim()"
+              >
+                <mat-icon>send</mat-icon> Ask
+              </button>
+            }
+          </div>
+
+          <!-- Quick Suggestion Chips -->
+          <div class="quick-chips">
+            <span class="chip-label">Quick questions:</span>
+            <button type="button" class="chip" (click)="setQuestion('Ramesh ka balance kitna hai?')">
+              👤 Ramesh ka balance
             </button>
-          } @else {
-            <button mat-flat-button color="primary" (click)="ask()" [disabled]="!question.trim()">
-              <mat-icon>send</mat-icon> Ask
+            <button type="button" class="chip" (click)="setQuestion('Total sales kitni hui hai?')">
+              📊 Total Sales
             </button>
-          }
+            <button type="button" class="chip" (click)="setQuestion('Pending balance kiska baaki hai?')">
+              ⏳ Pending Balances
+            </button>
+            <button type="button" class="chip" (click)="setQuestion('2+2')">
+              🧮 2+2
+            </button>
+          </div>
         </div>
+
+        @if (loading()) {
+          <div class="card loading-card">
+            <mat-spinner diameter="36" />
+            <div class="loading-text">
+              <p class="loading-title">AI Assistant is thinking...</p>
+              <p class="loading-sub">Analyzing your real-time customer and sales records</p>
+            </div>
+          </div>
+        } @else if (answer()) {
+          <div class="card answer-card">
+            <div class="answer-header">
+              <div class="header-left">
+                <span class="ai-badge">
+                  <mat-icon>auto_awesome</mat-icon> AI Response
+                </span>
+              </div>
+              <button mat-icon-button (click)="copyAnswer()" [matTooltip]="copied() ? 'Copied!' : 'Copy response'">
+                <mat-icon>{{ copied() ? 'check' : 'content_copy' }}</mat-icon>
+              </button>
+            </div>
+            <div class="answer-body">{{ answer() }}</div>
+          </div>
+        }
       </div>
 
-      @if (answer()) {
-        <div class="card answer-card">
-          <div class="answer-header">
-            <mat-icon>smart_toy</mat-icon>
-            <span>AI Response</span>
-          </div>
-          <div class="answer-body">{{ answer() }}</div>
-        </div>
-      }
-
-      @if (history().length) {
+      <!-- Right Column: Recent Queries History Sidebar -->
+      <aside class="history-column">
         <div class="card history-card">
-          <h3>Recent Queries</h3>
-          @for (item of history(); track $index) {
-            <div class="history-item">
-              <div class="history-q"><mat-icon>help_outline</mat-icon> {{ item.question }}</div>
-              <div class="history-a">{{ item.answer }}</div>
+          <div class="history-header">
+            <div class="history-title">
+              <mat-icon>history</mat-icon>
+              <h3>Recent Queries</h3>
+            </div>
+            @if (history().length > 0) {
+              <button mat-icon-button class="clear-btn" (click)="clearHistory()" matTooltip="Clear history">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            }
+          </div>
+
+          @if (history().length === 0) {
+            <div class="empty-history">
+              <div class="empty-icon-wrap">
+                <mat-icon>chat_bubble_outline</mat-icon>
+              </div>
+              <h4>No recent queries</h4>
+              <p>Your questions and AI responses will appear here on the right panel.</p>
+            </div>
+          } @else {
+            <div class="history-list">
+              @for (item of history(); track $index) {
+                <div class="history-item" (click)="loadHistory(item)" matTooltip="Click to load this answer">
+                  <div class="history-q">
+                    <mat-icon>help_outline</mat-icon>
+                    <span class="q-text">{{ item.question }}</span>
+                  </div>
+                  <div class="history-a">{{ item.answer }}</div>
+                </div>
+              }
             </div>
           }
         </div>
-      }
+      </aside>
     </div>
   `,
   styles: [`
-    .query-container { max-width: 800px; }
-    .hint { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
-    .input-row { display: flex; gap: 12px; align-items: flex-start; }
-    .query-input { flex: 1; }
-    .answer-card { margin-top: 20px; }
-    .answer-header { display: flex; align-items: center; gap: 8px; color: var(--accent-indigo); font-weight: 600; margin-bottom: 12px; }
-    .answer-body { font-size: 1.05rem; line-height: 1.7; padding: 16px; background: var(--bg-elevated); border-radius: var(--radius-sm); white-space: pre-wrap; }
-    .history-card { margin-top: 20px; }
-    .history-item { padding: 16px 0; border-bottom: 1px solid var(--border-color); &:last-child { border-bottom: none; } }
-    .history-q { display: flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 8px; }
-    .history-a { color: var(--text-secondary); font-size: 0.9rem; padding-left: 30px; }
+    .page-header {
+      margin-bottom: 24px;
+      .subtitle {
+        color: var(--text-muted);
+        margin-top: 4px;
+        font-size: 0.95rem;
+      }
+    }
+
+    .ai-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 960px) {
+      .ai-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .main-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
+    }
+
+    .query-card {
+      padding: 24px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      background: var(--bg-card);
+      border-radius: var(--radius-md, 12px);
+
+      .card-header-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 4px;
+
+        .header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+          }
+          .header-icon {
+            color: var(--accent-indigo, #6366f1);
+          }
+        }
+      }
+
+      .hint {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-bottom: 18px;
+      }
+
+      .input-row {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+
+        .query-input {
+          flex: 1;
+        }
+
+        .ask-btn {
+          height: 54px;
+          padding: 0 24px;
+          font-weight: 600;
+          border-radius: var(--radius-sm, 8px);
+        }
+      }
+
+      .quick-chips {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+
+        .chip-label {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          margin-right: 4px;
+        }
+
+        .chip {
+          background: rgba(99, 102, 241, 0.1);
+          border: 1px solid rgba(99, 102, 241, 0.25);
+          color: var(--text-primary);
+          padding: 6px 12px;
+          border-radius: 16px;
+          font-size: 0.825rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+
+          &:hover {
+            background: rgba(99, 102, 241, 0.22);
+            border-color: rgba(99, 102, 241, 0.5);
+            transform: translateY(-1px);
+          }
+        }
+      }
+    }
+
+    .loading-card {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 24px;
+      border-radius: var(--radius-md, 12px);
+      background: var(--bg-card);
+      border: 1px dashed var(--accent-indigo, #6366f1);
+
+      .loading-text {
+        .loading-title {
+          font-weight: 600;
+          font-size: 1rem;
+          margin-bottom: 4px;
+        }
+        .loading-sub {
+          color: var(--text-muted);
+          font-size: 0.85rem;
+          margin: 0;
+        }
+      }
+    }
+
+    .answer-card {
+      padding: 22px;
+      border-radius: var(--radius-md, 12px);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      background: var(--bg-card);
+      box-shadow: 0 4px 24px rgba(99, 102, 241, 0.08);
+
+      .answer-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+
+        .ai-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 12px;
+          border-radius: 20px;
+          background: rgba(99, 102, 241, 0.15);
+          color: var(--accent-indigo, #6366f1);
+          font-weight: 600;
+          font-size: 0.875rem;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+        }
+      }
+
+      .answer-body {
+        font-size: 1.05rem;
+        line-height: 1.75;
+        padding: 18px;
+        background: var(--bg-elevated);
+        border-radius: var(--radius-sm, 8px);
+        white-space: pre-wrap;
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+      }
+    }
+
+    /* Right Column: History Sidebar */
+    .history-column {
+      min-width: 0;
+    }
+
+    .history-card {
+      padding: 20px;
+      border-radius: var(--radius-md, 12px);
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      max-height: calc(100vh - 160px);
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 24px;
+
+      .history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border-color);
+
+        .history-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--accent-indigo, #6366f1);
+
+          h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+          }
+        }
+
+        .clear-btn {
+          color: var(--text-muted);
+          &:hover {
+            color: var(--warn, #ef4444);
+          }
+        }
+      }
+
+      .empty-history {
+        text-align: center;
+        padding: 36px 16px;
+        color: var(--text-muted);
+
+        .empty-icon-wrap {
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.04);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 12px;
+
+          mat-icon {
+            font-size: 28px;
+            width: 28px;
+            height: 28px;
+            color: var(--text-muted);
+          }
+        }
+
+        h4 {
+          margin: 0 0 6px;
+          font-size: 1rem;
+          color: var(--text-secondary);
+        }
+
+        p {
+          font-size: 0.85rem;
+          margin: 0;
+          line-height: 1.4;
+        }
+      }
+
+      .history-list {
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding-right: 4px;
+
+        .history-item {
+          padding: 12px;
+          border-radius: var(--radius-sm, 8px);
+          background: var(--bg-elevated);
+          border: 1px solid var(--border-color);
+          cursor: pointer;
+          transition: all 0.2s ease;
+
+          &:hover {
+            border-color: var(--accent-indigo, #6366f1);
+            background: rgba(99, 102, 241, 0.08);
+            transform: translateX(2px);
+          }
+
+          .history-q {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+
+            mat-icon {
+              font-size: 16px;
+              width: 16px;
+              height: 16px;
+              color: var(--accent-indigo, #6366f1);
+              flex-shrink: 0;
+            }
+
+            .q-text {
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+          }
+
+          .history-a {
+            color: var(--text-muted);
+            font-size: 0.825rem;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+        }
+      }
+    }
   `],
 })
 export default class AiQuery {
   question = '';
   answer = signal('');
   loading = signal(false);
-  history = signal<Array<{ question: string; answer: string }>>([]);
+  copied = signal(false);
+  history = signal<QueryHistoryItem[]>([]);
 
-  constructor(private aiApi: AiApiService) { }
+  constructor(private aiApi: AiApiService) {
+    try {
+      const saved = localStorage.getItem('hisaab_ai_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Sanitize any existing items that had 'Rs'
+        const sanitized = parsed.map((item: QueryHistoryItem) => ({
+          ...item,
+          answer: this.cleanLegacyRs(item.answer, item.question),
+        }));
+        this.history.set(sanitized);
+      }
+    } catch {}
+  }
+
+  setQuestion(prompt: string) {
+    this.question = prompt;
+    this.ask();
+  }
+
+  loadHistory(item: QueryHistoryItem) {
+    this.question = item.question;
+    this.answer.set(item.answer);
+  }
+
+  clearHistory() {
+    this.history.set([]);
+    try {
+      localStorage.removeItem('hisaab_ai_history');
+    } catch {}
+  }
+
+  copyAnswer() {
+    if (!this.answer()) return;
+    navigator.clipboard.writeText(this.answer()).then(() => {
+      this.copied.set(true);
+      setTimeout(() => this.copied.set(false), 2000);
+    });
+  }
 
   ask() {
     if (!this.question.trim() || this.loading()) return;
@@ -96,8 +536,23 @@ export default class AiQuery {
 
     this.aiApi.query(q).subscribe({
       next: (res) => {
-        this.answer.set(res.answer);
-        this.history.update((h) => [{ question: q, answer: res.answer }, ...h].slice(0, 10));
+        const cleanAnswer = this.cleanLegacyRs(res.answer, q);
+        this.answer.set(cleanAnswer);
+
+        const newItem: QueryHistoryItem = {
+          question: q,
+          answer: cleanAnswer,
+          timestamp: new Date().toISOString(),
+        };
+
+        this.history.update((h) => {
+          const updated = [newItem, ...h.filter((x) => x.question !== q)].slice(0, 20);
+          try {
+            localStorage.setItem('hisaab_ai_history', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+
         this.loading.set(false);
         this.question = '';
       },
@@ -107,5 +562,14 @@ export default class AiQuery {
         this.loading.set(false);
       },
     });
+  }
+
+  private cleanLegacyRs(text: string, originalQuestion: string): string {
+    let res = text.replace(/\bRs\.?\s*/gi, '₹').replace(/Rs\?/gi, '₹');
+    // If it's a pure math expression like 2+2, strip accidental ₹
+    if (/^[0-9\s+\-*/().%^]+$/.test(originalQuestion.trim())) {
+      res = res.replace(/^₹\s*/, '');
+    }
+    return res;
   }
 }

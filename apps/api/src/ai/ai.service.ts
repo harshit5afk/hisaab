@@ -81,9 +81,17 @@ If any field is unclear, set it to null. Set confidence to "low" if blurry.`;
 
   /**
    * Answer a natural language question about the business data.
-   * Multi-tier: Gemini AI (if key set) -> Free Pollinations.ai -> Built-in Smart Engine
    */
   async answerQuery(question: string): Promise<{ answer: string; dataUsed: string }> {
+    const trimmed = question.trim();
+
+    // 1. Check for pure arithmetic/math queries (e.g. "2+2", "500*12", "15000 - 3500")
+    const mathAnswer = this.evaluateMath(trimmed);
+    if (mathAnswer !== null) {
+      return { answer: mathAnswer, dataUsed: 'Local Math Evaluator' };
+    }
+
+    // 2. Fetch live summarized customer balance & sales data
     const customers = await this.prisma.customer.findMany({
       where: { deletedAt: null },
       select: {
@@ -121,47 +129,50 @@ If any field is unclear, set it to null. Set confidence to "low" if blurry.`;
     const dataUsed = JSON.stringify(
       {
         totalCustomers: customers.length,
-        totalSalesRs: totalSales,
-        totalCollectedRs: totalCollected,
-        totalOutstandingRs: totalOutstanding,
+        totalSales: totalSales,
+        totalCollected: totalCollected,
+        totalOutstanding: totalOutstanding,
         customers: context,
       },
       null,
       2,
     );
 
-    // 1. Try Gemini if configured
+    // 3. Try Gemini AI if API key configured
     if (this.genAI) {
       try {
         const genModel = this.genAI.getGenerativeModel({ model: this.geminiModel });
-        const systemPrompt = `You are an AI accounting assistant for Ion Shift Engineering.
+        const systemPrompt = `You are an AI assistant for Ion Shift Engineering accounting app (Hisaab).
 Data:
 ${dataUsed}
 
 Instructions:
 - Answer accurately and concisely.
-- Use Rs symbol for currency.
-- Respond in the user's language (English/Hindi/Hinglish).
-- Only use the provided data.`;
+- For currency, ALWAYS use the Indian Rupee symbol '₹' (NOT 'Rs' or 'Rs.').
+- For general questions or math, do NOT attach currency symbols.
+- Respond in the user's language (English/Hindi/Hinglish).`;
 
-        const result = await genModel.generateContent(`${systemPrompt}\n\nUser Question: ${question}`);
+        const result = await genModel.generateContent(`${systemPrompt}\n\nUser Question: ${trimmed}`);
         const answer = result.response.text();
         if (answer && answer.trim()) {
-          return { answer: answer.trim(), dataUsed };
+          return { answer: this.sanitizeCurrency(answer.trim(), trimmed), dataUsed };
         }
       } catch (err) {
         this.logger.warn('Gemini query failed, attempting free cloud fallback', err);
       }
     }
 
-    // 2. Try Free Cloud AI (Pollinations - zero key needed)
+    // 4. Try Free Cloud AI (Pollinations - no key needed)
     try {
-      const promptText = `You are an accounting assistant for Ion Shift Engineering.
-Total Sales: Rs ${totalSales}, Total Collected: Rs ${totalCollected}, Total Balance Due: Rs ${totalOutstanding}.
-Customer balances: ${context.map(c => `${c.name}: Balance Rs ${c.balance}, Invoiced Rs ${c.totalInvoiced}, Paid Rs ${c.totalPaid}`).join('; ')}
+      const promptText = `You are a helpful assistant for Ion Shift Engineering.
+Business Data: Total Sales: ₹${totalSales.toLocaleString('en-IN')}, Total Collections: ₹${totalCollected.toLocaleString('en-IN')}, Total Balance Due: ₹${totalOutstanding.toLocaleString('en-IN')}.
+Customers: ${context.map(c => `${c.name}: Balance ₹${c.balance}, Billed ₹${c.totalInvoiced}, Paid ₹${c.totalPaid}`).join('; ')}
 
-Question: ${question}
-Answer concisely using Rs symbol. If in Hindi or Hinglish, reply in Hindi/Hinglish.`;
+Question: ${trimmed}
+Rules:
+- For monetary amounts, always format with '₹' (e.g. ₹5,000). Never write 'Rs' or 'Rs.'.
+- For math or non-financial questions, do NOT attach any currency symbol.
+- Answer concisely in English, Hindi, or Hinglish based on question.`;
 
       const encoded = encodeURIComponent(promptText);
       const res = await fetch(`https://text.pollinations.ai/${encoded}`, {
@@ -171,16 +182,53 @@ Answer concisely using Rs symbol. If in Hindi or Hinglish, reply in Hindi/Hingli
       if (res.ok) {
         const text = await res.text();
         if (text && text.trim() && !text.includes('Error')) {
-          return { answer: text.trim(), dataUsed };
+          return { answer: this.sanitizeCurrency(text.trim(), trimmed), dataUsed };
         }
       }
     } catch {
       this.logger.debug('Pollinations fallback skipped, using local smart engine');
     }
 
-    // 3. Built-in Local Smart Business Engine (Instant & 100% Reliable)
-    const localAnswer = this.generateLocalSmartAnswer(question, context, totalSales, totalCollected, totalOutstanding);
-    return { answer: localAnswer, dataUsed };
+    // 5. Built-in Local Smart Business Engine (Instant & 100% Reliable)
+    const localAnswer = this.generateLocalSmartAnswer(trimmed, context, totalSales, totalCollected, totalOutstanding);
+    return { answer: this.sanitizeCurrency(localAnswer, trimmed), dataUsed };
+  }
+
+  /**
+   * Evaluates simple arithmetic expressions safely without adding currency.
+   */
+  private evaluateMath(q: string): string | null {
+    const clean = q.replace(/^(what is|calculate|solve|kitna hota hai)\s*/i, '').trim();
+    // Match arithmetic like "2+2", "100 * 5", "5000 / 2", "10 + 20 - 5"
+    if (/^[0-9\s+\-*/().%^]+$/.test(clean) && /[+\-*/]/.test(clean)) {
+      try {
+        const sanitized = clean.replace(/[^0-9+\-*/().]/g, '');
+        const res = Function(`'use strict'; return (${sanitized})`)();
+        if (typeof res === 'number' && !isNaN(res)) {
+          return `${clean} = ${res.toLocaleString('en-IN')}`;
+        }
+      } catch {}
+    }
+    return null;
+  }
+
+  /**
+   * Replaces legacy 'Rs' or 'Rs.' with standard '₹' and removes currency if non-financial.
+   */
+  private sanitizeCurrency(text: string, originalQuestion: string): string {
+    let result = text;
+    // Replace 'Rs.' or 'Rs' or 'RS' with '₹'
+    result = result.replace(/\bRs\.?\s*/gi, '₹');
+    result = result.replace(/Rs\?/gi, '₹');
+
+    // If the question is simple math or has no financial terms, strip accidental currency prefix
+    const isFinancial = /(balance|sale|bikri|invoic|bill|payment|paid|rupee|paise|price|cost|due|udhar|hisaab|customer|grahak)/i.test(originalQuestion);
+    if (!isFinancial) {
+      // E.g. "₹4" -> "4", "₹ 4" -> "4"
+      result = result.replace(/^₹\s*(\d+(\.\d+)?)$/, '$1');
+    }
+
+    return result;
   }
 
   private generateLocalSmartAnswer(
