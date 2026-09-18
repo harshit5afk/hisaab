@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI, Part } from '@google/generative-ai';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface ExtractedInvoice {
@@ -15,104 +15,101 @@ export interface ExtractedInvoice {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private client: Anthropic | null = null;
+  private genAI: GoogleGenerativeAI | null = null;
+  private readonly model = 'gemini-1.5-flash';
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
-    const apiKey = this.config.get<string>('ANTHROPIC_API_KEY');
-    if (apiKey && apiKey !== '' && !apiKey.startsWith('sk-ant-...')) {
-      this.client = new Anthropic({ apiKey });
+    const apiKey = this.config.get<string>('GEMINI_API_KEY');
+    if (apiKey && apiKey.trim() !== '' && !apiKey.startsWith('YOUR_')) {
+      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.logger.log('Gemini AI initialized with model: ' + this.model);
     } else {
       this.logger.warn(
-        'ANTHROPIC_API_KEY not set — AI features will be unavailable',
+        'GEMINI_API_KEY not set -- AI features will be unavailable. Get a free key at https://aistudio.google.com/app/apikey',
       );
     }
   }
 
-  private ensureClient(): Anthropic {
-    if (!this.client) {
+  private ensureClient(): GoogleGenerativeAI {
+    if (!this.genAI) {
       throw new Error(
-        'AI features are unavailable. Please set ANTHROPIC_API_KEY in your .env file.',
+        'AI features are unavailable. Please set GEMINI_API_KEY in your .env file. Get a free key at https://aistudio.google.com/app/apikey',
       );
     }
-    return this.client;
+    return this.genAI;
   }
 
   /**
-   * Extract structured invoice data from an uploaded image.
+   * Extract structured invoice data from an uploaded image using Gemini Vision.
    */
   async extractInvoice(
     imageBuffer: Buffer,
     mimeType: string,
   ): Promise<ExtractedInvoice> {
     const client = this.ensureClient();
+    const genModel = client.getGenerativeModel({ model: this.model });
 
-    const model = this.config.get<string>('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-20241022';
-    const response = await client.messages.create({
-      model,
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
-                data: imageBuffer.toString('base64'),
-              },
-            },
-            {
-              type: 'text',
-              text: `You are an invoice data extraction assistant for an Indian business.
+    const prompt = 
+`You are an invoice data extraction assistant for an Indian business.
+
+
 Extract the following from this invoice/bill image and return ONLY valid JSON (no markdown, no explanation):
-{
-  "vendor": "string — the seller/shop name",
-  "billNo": "string or null — bill/invoice number if visible",
-  "date": "YYYY-MM-DD — the invoice date",
-  "amount": number — total amount in rupees (e.g. 1500.50),
-  "items": [
-    { "description": "string", "qty": number, "rate": number, "amount": number }
-  ],
-  "confidence": "high" | "medium" | "low"
-}
-If any field is unclear or not visible, set it to null.
-If you cannot read the items, return an empty items array.
-Set confidence to "low" if the image is blurry or partially visible.`,
-            },
-          ],
-        },
-      ],
-    });
 
-    const text =
-      response.content[0].type === 'text' ? response.content[0].text : '';
+
+{
+
+
+  "vendor": "string - the seller/shop name",
+
+
+  "billNo": "string or null - bill/invoice number if visible",
+
+
+  "date": "YYYY-MM-DD - the invoice date",
+
+
+  "amount": "number - total amount in rupees (e.g. 1500.50)",
+
+
+  "items": [{ "description": "string", "qty": "number", "rate": "number", "amount": "number" }],
+
+
+  "confidence": "high | medium | low"
+
+
+}
+
+
+If any field is unclear, set it to null. Set confidence to "low" if image is blurry.
+`;
+
+    const imagePart: Part = {
+      inlineData: {
+        data: imageBuffer.toString('base64'),
+        mimeType: mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
+      },
+    };
 
     try {
-      // Strip markdown code fences if present
-      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const result = await genModel.generateContent([prompt, imagePart]);
+      const text = result.response.text();
+      const cleaned = text.replace(/`json\n?/g, '').replace(/`\n?/g, '').trim();
       return JSON.parse(cleaned);
-    } catch {
-      this.logger.error('Failed to parse AI response as JSON', text);
-      return {
-        vendor: null,
-        billNo: null,
-        date: null,
-        amount: null,
-        items: [],
-        confidence: 'low',
-      };
+    } catch (err) {
+      this.logger.error('Failed to extract invoice via Gemini', err);
+      return { vendor: null, billNo: null, date: null, amount: null, items: [], confidence: 'low' };
     }
   }
 
   /**
-   * Answer a natural language question about the business data.
+   * Answer a natural language question about the business data using Gemini.
    */
   async answerQuery(question: string): Promise<{ answer: string; dataUsed: string }> {
     const client = this.ensureClient();
+    const genModel = client.getGenerativeModel({ model: this.model });
 
     // Fetch summarised customer balance data for context
     const customers = await this.prisma.customer.findMany({
@@ -137,7 +134,7 @@ Set confidence to "low" if the image is blurry or partially visible.`,
       return {
         name: c.name,
         phone: c.phone,
-        totalInvoiced: totalInvoiced / 100, // convert paise to rupees for LLM
+        totalInvoiced: totalInvoiced / 100,
         totalPaid: totalPaid / 100,
         balance: (totalInvoiced - totalPaid) / 100,
         invoiceCount: c.invoices.length,
@@ -147,28 +144,37 @@ Set confidence to "low" if the image is blurry or partially visible.`,
 
     const dataUsed = JSON.stringify(context, null, 2);
 
-    const model = this.config.get<string>('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-20241022';
-    const response = await client.messages.create({
-      model,
-      max_tokens: 512,
-      system: `You are a helpful accounting assistant for an Indian business called Ion Shift Engineering.
-You have access to the following customer summary data (amounts in ₹):
-${dataUsed}
+    const systemPrompt = 
+'You are a helpful accounting assistant for an Indian business called Ion Shift Engineering.\\n' +
 
-Rules:
-- Answer concisely and accurately based on the data above.
-- Use ₹ symbol for currency.
-- If the question is in Hindi/Hinglish, respond in the same language.
-- If you cannot answer from the data, say so clearly.
-- Do NOT make up data that is not in the context.`,
-      messages: [{ role: 'user', content: question }],
-    });
 
-    const answer =
-      response.content[0].type === 'text'
-        ? response.content[0].text
-        : 'Unable to generate a response.';
+      'You have access to the following customer summary data (amounts in Rs):\\n' + dataUsed + '\\n\\n' +
 
-    return { answer, dataUsed };
+
+      'Rules:\\n' +
+
+
+      '- Answer concisely and accurately based on the data above.\\n' +
+
+
+      '- Use Rs symbol for currency.\\n' +
+
+
+      '- If the question is in Hindi/Hinglish, respond in the same language.\\n' +
+
+
+      '- If you cannot answer from the data, say so clearly.\\n' +
+
+
+      '- Do NOT make up data that is not in the context.';
+
+    try {
+      const result = await genModel.generateContent(systemPrompt + '\\n\\nUser question: ' + question);
+      const answer = result.response.text();
+      return { answer, dataUsed };
+    } catch (err) {
+      this.logger.error('Gemini query failed', err);
+      throw new Error('AI query failed. Please try again.');
+    }
   }
 }
