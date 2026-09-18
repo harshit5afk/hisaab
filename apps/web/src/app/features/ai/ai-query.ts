@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+﻿import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,15 +9,21 @@ import { AiApiService } from '../../core/api/ai-api.service';
 
 @Component({
   standalone: true,
-  imports: [FormsModule,
-    MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [
+    FormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+  ],
   template: `
     <div class="page-header"><h1>AI Query</h1></div>
 
     <div class="query-container">
       <div class="card query-box">
         <h3>Ask about your business</h3>
-        <p class="hint">Try: "Ramesh ka kitna balance baaki hai?" or "Total sales this month?"</p>
+        <p class="hint">Try: "hi", "Ramesh ka kitna balance baaki hai?" or "Total sales this month?"</p>
 
         <div class="input-row">
           <mat-form-field appearance="outline" class="query-input">
@@ -95,8 +101,9 @@ export default class AiQuery {
         this.loading.set(false);
         this.question = '';
       },
-      error: () => {
-        this.answer.set('Sorry, I could not process that query. Please try again.');
+      error: (err) => {
+        const errorMsg = err?.error?.message || 'Sorry, I could not process that query. Please try again.';
+        this.answer.set(errorMsg);
         this.loading.set(false);
       },
     });
