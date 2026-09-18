@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, OnDestroy } from '@angular/core';
+﻿import { Component, OnInit, signal, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -76,7 +76,7 @@ const GST_STATE_MAP: Record<string, string> = {
           <input
             matInput
             formControlName="name"
-            placeholder="e.g. Ramesh Traders / Acme Enterprises"
+            placeholder="e.g. Apex Industrial / Rohit Traders"
             autocomplete="off"
           />
           <mat-icon matPrefix>person</mat-icon>

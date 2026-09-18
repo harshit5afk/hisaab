@@ -147,7 +147,7 @@ Data:
 ${dataUsed}
 
 Instructions:
-- Answer accurately and concisely.
+- Answer accurately and concisely based ONLY on real customers and records in the data.
 - For currency, ALWAYS use the Indian Rupee symbol '₹' (NOT 'Rs' or 'Rs.').
 - For general questions or math, do NOT attach currency symbols.
 - Respond in the user's language (English/Hindi/Hinglish).`;
@@ -166,7 +166,7 @@ Instructions:
     try {
       const promptText = `You are a helpful assistant for Ion Shift Engineering.
 Business Data: Total Sales: ₹${totalSales.toLocaleString('en-IN')}, Total Collections: ₹${totalCollected.toLocaleString('en-IN')}, Total Balance Due: ₹${totalOutstanding.toLocaleString('en-IN')}.
-Customers: ${context.map(c => `${c.name}: Balance ₹${c.balance}, Billed ₹${c.totalInvoiced}, Paid ₹${c.totalPaid}`).join('; ')}
+Real Customers: ${context.map(c => `${c.name}: Balance ₹${c.balance}, Billed ₹${c.totalInvoiced}, Paid ₹${c.totalPaid}`).join('; ')}
 
 Question: ${trimmed}
 Rules:
@@ -199,7 +199,6 @@ Rules:
    */
   private evaluateMath(q: string): string | null {
     const clean = q.replace(/^(what is|calculate|solve|kitna hota hai)\s*/i, '').trim();
-    // Match arithmetic like "2+2", "100 * 5", "5000 / 2", "10 + 20 - 5"
     if (/^[0-9\s+\-*/().%^]+$/.test(clean) && /[+\-*/]/.test(clean)) {
       try {
         const sanitized = clean.replace(/[^0-9+\-*/().]/g, '');
@@ -217,14 +216,11 @@ Rules:
    */
   private sanitizeCurrency(text: string, originalQuestion: string): string {
     let result = text;
-    // Replace 'Rs.' or 'Rs' or 'RS' with '₹'
     result = result.replace(/\bRs\.?\s*/gi, '₹');
     result = result.replace(/Rs\?/gi, '₹');
 
-    // If the question is simple math or has no financial terms, strip accidental currency prefix
     const isFinancial = /(balance|sale|bikri|invoic|bill|payment|paid|rupee|paise|price|cost|due|udhar|hisaab|customer|grahak)/i.test(originalQuestion);
     if (!isFinancial) {
-      // E.g. "₹4" -> "4", "₹ 4" -> "4"
       result = result.replace(/^₹\s*(\d+(\.\d+)?)$/, '$1');
     }
 
@@ -239,10 +235,11 @@ Rules:
     totalOutstanding: number,
   ): string {
     const q = question.toLowerCase().trim();
+    const sampleCustomer = customers.find(c => c.name && c.name.toLowerCase() !== 'xxxx')?.name || 'Rohit Sharma';
 
     // Greetings
     if (/^(hi|hello|hey|namaste|kem cho|good morning|good evening|good afternoon|salam)/i.test(q) || q === 'hi' || q === 'hello') {
-      return `Hello! 👋 I am your Hisaab Business Assistant for Ion Shift Engineering.\n\n📊 Business Overview:\n• Total Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Balance: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nYou can ask me:\n- "<Customer Name> ka balance kitna hai?"\n- "Who has pending balance?"\n- "Total sales"`;
+      return `Hello! 👋 I am your Hisaab Business Assistant for Ion Shift Engineering.\n\n📊 Business Overview:\n• Total Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Balance: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nYou can ask me:\n- "${sampleCustomer} ka balance kitna hai?"\n- "Who has pending balance?"\n- "Total sales"`;
     }
 
     // Customer Lookup
@@ -258,6 +255,12 @@ Rules:
 
         return `👤 Customer: ${c.name}\n${c.phone ? '📞 Phone: ' + c.phone + '\n' : ''}• Total Billed: ₹${c.totalInvoiced.toLocaleString('en-IN')}\n• Total Paid: ₹${c.totalPaid.toLocaleString('en-IN')}\n• Balance: ${balanceStatus}`;
       }
+    }
+
+    // If user asks about someone not in customer list
+    if (q.includes('balance') && (q.includes('ka') || q.includes('ki') || q.includes('hai'))) {
+      const topDebtors = customers.filter(c => c.balance > 0).slice(0, 3).map(c => c.name).join(', ');
+      return `Yeh customer aapke records me nahi mila. Aap inme se kisi ka hisaab pooch sakte hain:\n${topDebtors || 'Customer list'}\n\nYa "Total sales" ya "Pending balances" pooch sakte hain!`;
     }
 
     // Sales / Revenue Queries
@@ -282,6 +285,6 @@ Rules:
     }
 
     // General Summary
-    return `📈 Business Overview:\n• Total Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nTry asking: "<Name> ka balance", "Pending payments", or "Total sales"!`;
+    return `📈 Business Overview:\n• Total Customers: ${customers.length}\n• Total Sales: ₹${totalSales.toLocaleString('en-IN')}\n• Total Collections: ₹${totalCollected.toLocaleString('en-IN')}\n• Pending Outstanding: ₹${totalOutstanding.toLocaleString('en-IN')}\n\nTry asking: "${sampleCustomer} ka balance", "Pending payments", or "Total sales"!`;
   }
 }

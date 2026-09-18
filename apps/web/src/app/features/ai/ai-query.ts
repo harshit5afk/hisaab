@@ -1,4 +1,4 @@
-﻿import { Component, signal } from '@angular/core';
+﻿import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AiApiService } from '../../core/api/ai-api.service';
+import { CustomersApiService } from '../../core/api/customers-api.service';
 
 interface QueryHistoryItem {
   question: string;
@@ -43,7 +44,7 @@ interface QueryHistoryItem {
               <h3>Ask about your business</h3>
             </div>
           </div>
-          <p class="hint">Ask in plain English or Hinglish (e.g. "Ramesh ka balance", "Total sales", "2+2")</p>
+          <p class="hint">Ask in plain English or Hinglish (e.g. "Total sales", "Pending balance", customer hisaab, or "2+2")</p>
 
           <div class="input-row">
             <mat-form-field appearance="outline" class="query-input">
@@ -52,7 +53,7 @@ interface QueryHistoryItem {
                 matInput
                 [(ngModel)]="question"
                 (keydown.enter)="ask()"
-                placeholder="e.g. Ramesh ka kitna balance baaki hai?, 2+2, total sales"
+                placeholder="e.g. Total sales, pending balance, 2+2"
               />
               <mat-icon matPrefix class="input-icon">chat</mat-icon>
             </mat-form-field>
@@ -74,18 +75,20 @@ interface QueryHistoryItem {
             }
           </div>
 
-          <!-- Quick Suggestion Chips -->
+          <!-- Quick Suggestion Chips with Real Customers from Database -->
           <div class="quick-chips">
             <span class="chip-label">Quick questions:</span>
-            <button type="button" class="chip" (click)="setQuestion('Ramesh ka balance kitna hai?')">
-              👤 Ramesh ka balance
-            </button>
             <button type="button" class="chip" (click)="setQuestion('Total sales kitni hui hai?')">
               📊 Total Sales
             </button>
             <button type="button" class="chip" (click)="setQuestion('Pending balance kiska baaki hai?')">
               ⏳ Pending Balances
             </button>
+            @for (cust of realCustomers(); track cust.id) {
+              <button type="button" class="chip" (click)="setQuestion(cust.name + ' ka balance kitna hai?')">
+                👤 {{ cust.name }}
+              </button>
+            }
             <button type="button" class="chip" (click)="setQuestion('2+2')">
               🧮 2+2
             </button>
@@ -481,19 +484,22 @@ interface QueryHistoryItem {
     }
   `],
 })
-export default class AiQuery {
+export default class AiQuery implements OnInit {
   question = '';
   answer = signal('');
   loading = signal(false);
   copied = signal(false);
   history = signal<QueryHistoryItem[]>([]);
+  realCustomers = signal<Array<{ id: string; name: string }>>([]);
 
-  constructor(private aiApi: AiApiService) {
+  constructor(
+    private aiApi: AiApiService,
+    private customersApi: CustomersApiService,
+  ) {
     try {
       const saved = localStorage.getItem('hisaab_ai_history');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Sanitize any existing items that had 'Rs'
         const sanitized = parsed.map((item: QueryHistoryItem) => ({
           ...item,
           answer: this.cleanLegacyRs(item.answer, item.question),
@@ -501,6 +507,18 @@ export default class AiQuery {
         this.history.set(sanitized);
       }
     } catch {}
+  }
+
+  ngOnInit() {
+    this.customersApi.findAll({ limit: 4 }).subscribe({
+      next: (res) => {
+        const list = (res?.data || res || []).filter(
+          (c: any) => c.name && c.name.toLowerCase() !== 'xxxx',
+        );
+        this.realCustomers.set(list.slice(0, 3));
+      },
+      error: () => {},
+    });
   }
 
   setQuestion(prompt: string) {
@@ -566,7 +584,6 @@ export default class AiQuery {
 
   private cleanLegacyRs(text: string, originalQuestion: string): string {
     let res = text.replace(/\bRs\.?\s*/gi, '₹').replace(/Rs\?/gi, '₹');
-    // If it's a pure math expression like 2+2, strip accidental ₹
     if (/^[0-9\s+\-*/().%^]+$/.test(originalQuestion.trim())) {
       res = res.replace(/^₹\s*/, '');
     }
